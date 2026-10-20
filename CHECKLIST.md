@@ -105,3 +105,39 @@ This is a general-purpose example. At the start of a task, define the goal and c
 - Ball dropped (not thrown) and left lying: after `rollTimeout` only if a roll had started; otherwise it stays until picked up.
 - Standing pins nudged off their spot are left where they are (as in real bowling); not re-spotted.
 - `Floor` tag still undefined in TagManager (CompareTag will log errors when pins touch triggers) — separate decision.
+
+---
+
+# Task: VR pause menu
+
+## Goal and Scope
+- Goal: Script for the existing `Paused` window — resume (button), quit (button), mute (toggle button), volume (slider).
+- Work targets: `PauseMenu.cs` (new), `SoundManager.cs` (master volume/mute API); scene wiring in Unity Editor.
+- Completion criteria: No compile errors; in Play mode the window opens/closes, game time stops while open, mute and volume apply to all sounds and persist.
+
+## Current Status
+- Phase: Scripts written. Scene wiring + Play test pending.
+- Next action: Editor setup below → Play-test (Esc in Editor, controller menu button on device).
+
+## Actions
+- [x] `SoundManager`: `MasterVolume`/`IsMuted`, `SetMasterVolume`, `SetMuted`, `ToggleMute`, applied via `AudioListener.volume`, saved in PlayerPrefs, loaded in `Awake`.
+- [x] `PauseMenu`: `Pause`/`Resume`/`TogglePause`/`Quit`; `Time.timeScale` 0↔1; panel placed in front of the player's head on open; pause via `InputActionReference` (+ Esc in Editor); mute via Button (toggles) or Toggle (isOn = muted); optional icon/label swap; slider synced with `SetValueWithoutNotify`; quit loads `quitSceneName` or quits app.
+- [ ] Scene: `Paused` Canvas Render Mode → World Space (currently Screen Space - Overlay = invisible in headset), scale ≈ 0.001, Event Camera = Main Camera.
+- [ ] Scene: add `PauseMenu` to an always-active object (e.g. GameManager), assign `Paused`, `start` → resumeButton, `quit` → quitButton, `Slider` → volumeSlider, `Button` → add Button (or Toggle) component and assign as mute.
+- [ ] Scene: assign `pauseAction` (e.g. XRI Left/Menu from XRI Default Input Actions).
+- [ ] Same wiring in `TutorialScene` if it is used.
+
+## Verification Record
+| Check | Command or method | Result | Reason for not running or failure |
+|---|---|---|---|
+| Scene structure | Parsed `BowlingScene.unity` YAML (read-only): `Paused` → Image/Title, `Button` (Image only, no Button component), `Slider` (0–1), `start`/`quit` (Button, no OnClick) | Confirmed | |
+| Canvas components | GUIDs resolved: CanvasScaler, GraphicRaycaster, TrackedDeviceGraphicRaycaster | Confirmed | |
+| Input handling | `activeInputHandler: 1` (Input System only) → used `Keyboard.current` for Editor Esc | Confirmed | |
+| Unity compile | Unity Editor Console | Not run | Editor not available to Claude |
+| Play-mode behavior | Unity Editor / device | Not run | Scene wiring pending |
+
+## Key Decisions
+- Volume/mute live in `SoundManager` (reuse existing manager, CLAUDE.md rule) and use `AudioListener.volume` so every audio source is covered.
+- Pause uses `Time.timeScale = 0` (physics, GameManager timers and coroutines stop). Audio keeps playing so volume changes can be heard.
+- Listeners are added in code, so `start`/`quit` OnClick lists can stay empty (adding them in the Inspector too would call twice).
+- Raising the slider above 0 while muted unmutes.

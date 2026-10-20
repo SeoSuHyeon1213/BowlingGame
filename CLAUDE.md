@@ -17,7 +17,7 @@
 ## 주요 디렉터리
 | 경로 | 역할 | 편집 |
 |---|---|---|
-| `Assets/Scripts/` | 프로젝트 자체 게임 코드 (`GameManager`, `BowlingScoreCard`, `PinSetter`, `BowlingPin`, `SoundManager`, `BowlingBall`, `BallReturnZone`) | 주 작업 대상 |
+| `Assets/Scripts/` | 프로젝트 자체 게임 코드 (`GameManager`, `BowlingScoreCard`, `PinSetter`, `BowlingPin`, `SoundManager`, `PauseMenu`, `BowlingBall`, `BallReturnZone`) | 주 작업 대상 |
 | `Assets/Scenes/` | 게임 씬 (`BowlingScene` 메인) | Unity Editor에서 편집 |
 | `Assets/Settings/`, `Assets/XR/`, `ProjectSettings/` | URP·XR·프로젝트 설정 | Editor를 통해 변경, 직접 텍스트 편집 지양 |
 | `Assets/Bowling Club/`, `Assets/Sketchfab For Unity/`, `Assets/The combat collection STARTER/` | 외부 에셋 | 외부 관리 — 직접 수정 금지 |
