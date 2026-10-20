@@ -3,7 +3,7 @@
 이 문서는 프로젝트 루트의 `AGENTS.md`(범용 작업 지침)를 바탕으로, 이 프로젝트에서 확인한 사실을 채워 넣은 Claude용 작업 지침입니다. 이 디렉터리와 하위 디렉터리 전체에 적용됩니다. 지속적인 규칙은 이 문서(및 `AGENTS.md`)에, 현재 작업 상태는 `CHECKLIST.md`에 기록합니다.
 
 ## 프로젝트 정보 (2026-10-14 설정 파일로 확인)
-- 목적: VR 볼링 게임. 핀이 바닥(`Floor` 태그)에 닿으면 점수를 올리고 효과음을 재생한다.
+- 목적: VR 볼링 게임. 현재 솔로 10프레임 1게임을 지원한다(`GameManager` 상태 머신 + `BowlingScoreCard` 표준 점수 규칙). 핀 쓰러짐은 투구가 끝나고 핀이 멈춘 뒤 기울기/낙하로 판정하며(`BowlingPin.IsKnockedDown`), `Floor` 태그 접촉은 효과음에만 쓴다. 계획: 이후 대 CPU, 대 온라인 1:1 모드 추가.
 - 공 회수 방식: 핀 뒤 수거 트리거(`Cube (2)`) 또는 맵 아래 낙하 트리거(루트 `Cube`)에 공이 들어오면(`BallReturnZone`) 공을 지정된 복귀 위치로 옮기고(`BowlingBall.returnPoint`), 공은 거기서 굴러가 `Ball Stand` 아래 큐브의 `XRSocketInteractor`에 안착한다. 안착은 코드로 강제하지 않고 소켓에 맡긴다.
 - 엔진: Unity `6000.6.0f1` (`ProjectSettings/ProjectVersion.txt`)
 - 렌더 파이프라인: URP `17.6.0`
@@ -17,7 +17,7 @@
 ## 주요 디렉터리
 | 경로 | 역할 | 편집 |
 |---|---|---|
-| `Assets/Scripts/` | 프로젝트 자체 게임 코드 (`GameManager`, `BowlingPin`, `SoundManager`, `BowlingBall`, `BallReturnZone`) | 주 작업 대상 |
+| `Assets/Scripts/` | 프로젝트 자체 게임 코드 (`GameManager`, `BowlingScoreCard`, `PinSetter`, `BowlingPin`, `SoundManager`, `BowlingBall`, `BallReturnZone`) | 주 작업 대상 |
 | `Assets/Scenes/` | 게임 씬 (`BowlingScene` 메인) | Unity Editor에서 편집 |
 | `Assets/Settings/`, `Assets/XR/`, `ProjectSettings/` | URP·XR·프로젝트 설정 | Editor를 통해 변경, 직접 텍스트 편집 지양 |
 | `Assets/Bowling Club/`, `Assets/Sketchfab For Unity/`, `Assets/The combat collection STARTER/` | 외부 에셋 | 외부 관리 — 직접 수정 금지 |

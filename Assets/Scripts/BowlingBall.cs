@@ -1,6 +1,8 @@
 ﻿using System.Collections;
 using UnityEngine;
+using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 // 볼링공 복귀 처리.
 // 수거 구역(BallReturnZone)에 들어오면 returnPoint로 옮긴 뒤 물리로 굴러가게 두고,
@@ -17,6 +19,9 @@ public class BowlingBall : MonoBehaviour
     [Tooltip("수거 구역에 들어간 뒤 복귀까지 기다리는 시간(초).")]
     public float returnDelay = 0f;
 
+    [Tooltip("손에서 놓은 직후 이 속도(m/s) 이상이면 투구로 본다. 그보다 느리면 그냥 내려놓은 것으로 본다.")]
+    public float minThrowSpeed = 0.5f;
+
     private Rigidbody rb;
     private XRBaseInteractable interactable;
     private bool isReturning = false;
@@ -25,6 +30,56 @@ public class BowlingBall : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         interactable = GetComponent<XRBaseInteractable>();
+    }
+
+    void OnEnable()
+    {
+        if (interactable != null)
+        {
+            interactable.selectEntered.AddListener(OnSelectEntered);
+            interactable.selectExited.AddListener(OnSelectExited);
+        }
+    }
+
+    void OnDisable()
+    {
+        if (interactable != null)
+        {
+            interactable.selectEntered.RemoveListener(OnSelectEntered);
+            interactable.selectExited.RemoveListener(OnSelectExited);
+        }
+    }
+
+    private void OnSelectEntered(SelectEnterEventArgs args)
+    {
+        // 소켓 안착은 투구와 무관하다. 손으로 다시 잡으면 진행 중인 투구를 취소한다.
+        if (args.interactorObject is XRSocketInteractor) return;
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnBallGrabbed(this);
+        }
+    }
+
+    private void OnSelectExited(SelectExitEventArgs args)
+    {
+        if (args.isCanceled || args.interactorObject is XRSocketInteractor) return;
+
+        StartCoroutine(CheckThrowRoutine());
+    }
+
+    // 놓는 순간에는 던지기 속도가 아직 적용되지 않았을 수 있어 물리 갱신 후 속도를 확인한다.
+    private IEnumerator CheckThrowRoutine()
+    {
+        yield return new WaitForFixedUpdate();
+        yield return new WaitForFixedUpdate();
+
+        if (interactable != null && interactable.isSelected) yield break;
+
+        if (rb.linearVelocity.magnitude >= minThrowSpeed && GameManager.Instance != null)
+        {
+            GameManager.Instance.OnBallThrown(this);
+        }
     }
 
     public void ReturnToRack()
@@ -44,6 +99,11 @@ public class BowlingBall : MonoBehaviour
         if (interactable != null && interactable.isSelected)
         {
             return;
+        }
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnBallCollected(this);
         }
 
         StartCoroutine(ReturnRoutine());
