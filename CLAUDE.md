@@ -12,15 +12,17 @@
 - UI 텍스트: TextMesh Pro (`TextMeshProUGUI`)
 - 대상 플랫폼: Android (Min/Target SDK 34), 스크립팅 백엔드 IL2CPP
 - 빌드 씬: `Assets/Scenes/BowlingScene.unity`(활성). `SampleScene.unity`는 빌드 목록에서 비활성.
+- 씬 흐름(계획, 2026-10-21): `TutorialScene`(연습) → "MAIN GAME / START" 버튼(`SceneStartButton`) → `BowlingScene`(메인 게임). 빌드 순서는 메뉴 `Tools > Bowling > Set Build Order (Tutorial → Bowling)`로 맞춘다(실행 전까지 TutorialScene은 빌드 목록에 없음).
 - 패키지 버전의 기준은 `Packages/manifest.json`이며, 위 버전은 이 파일에서 확인했다.
 
 ## 주요 디렉터리
 | 경로 | 역할 | 편집 |
 |---|---|---|
-| `Assets/Scripts/` | 프로젝트 자체 게임 코드 (`GameManager`, `BowlingScoreCard`, `PinSetter`, `BowlingPin`, `SoundManager`, `PauseMenu`, `BowlingBall`, `BallReturnZone`) | 주 작업 대상 |
+| `Assets/Scripts/` | 프로젝트 자체 게임 코드 (`GameManager`, `BowlingScoreCard`, `PinSetter`, `BowlingPin`, `SoundManager`, `PauseMenu`, `NeonFlicker`, `BowlingBall`, `BallReturnZone`, `SceneStartButton`; `Editor/BowlingSceneWiring`, `Editor/MainGameStartButtonMenu`) | 주 작업 대상 |
 | `Assets/Scenes/` | 게임 씬 (`BowlingScene` 메인) | Unity Editor에서 편집 |
 | `Assets/Settings/`, `Assets/XR/`, `ProjectSettings/` | URP·XR·프로젝트 설정 | Editor를 통해 변경, 직접 텍스트 편집 지양 |
-| `Assets/Bowling Club/`, `Assets/Sketchfab For Unity/`, `Assets/The combat collection STARTER/` | 외부 에셋 | 외부 관리 — 직접 수정 금지 |
+| `Assets/Bowling Club/`, `Assets/Sketchfab For Unity/`, `Assets/The combat collection STARTER/`, `Assets/Suggo Creations/` (RETROWAVE SKIES Lite) | 외부 에셋 | 외부 관리 — 직접 수정 금지 |
+| `Assets/ThirdParty/Neon/` | 네온 UI 에셋: Cyan Neon UI Pack(Uryon Games, 재배포 금지 라이선스), Pixel Art Neon Sign Pack(CC0), SVGRepo 볼링 아이콘(핀/공 SVG는 틴트용으로 흰색으로 변경함) | 외부 에셋 — 라이선스 확인 후 사용 |
 | `Assets/Samples/`, `Assets/XRI/`, `Assets/VRTemplateAssets/`, `Assets/CompositionLayers/`, `Assets/TextMesh Pro/` | 패키지 샘플/템플릿/임포트 리소스 | 외부 관리 — 필요 시 복사 후 수정 |
 | `Assets/Libraries/`, `Assets/Resources/` | 용도 미확인 | 편집 전 내용 확인 |
 | `ForBuild_BackUpThisFolder_ButDontShipItWithYourGame/` | IL2CPP 빌드 산출물(il2cppOutput 등). Git에 추적되고 있음 | 생성 파일 — 직접 수정 금지 |
@@ -31,6 +33,8 @@
 - 확인된 CLI 빌드/테스트 명령은 없다. 빌드와 실행은 Unity Editor(6000.6.0f1)에서 프로젝트 루트를 열어 수행한다.
 - 테스트 코드와 asmdef는 현재 없다 (`Assets/` 내 프로젝트 소유 테스트 없음).
 - 스크립트 변경 후 최소 검증: Editor에서 컴파일 오류가 없는지 Console 확인 → `BowlingScene`에서 Play 모드로 동작 확인.
+- Editor 없이 컴파일만 확인하는 방법(2026-10-21 실행, 성공): Unity가 생성한 `Assembly-CSharp-Editor.csproj`의 `<Reference>`(HintPath는 프로젝트 루트 기준 상대 경로이므로 절대 경로로 변환)를 복사한 임시 csproj(netstandard2.1, LangVersion 9.0, DefineConstants 동일)를 scratch 폴더에 만들고 `Assets/Scripts/**/*.cs`를 포함해 `dotnet build`. Unity Editor 컴파일을 대신하지는 않는다(asmdef 분리·Editor 전용 코드 경계 미검증).
+- 씬 연결 자동화: Editor 메뉴 `Tools > Bowling > Wire Open Scene`(`Assets/Scripts/Editor/BowlingSceneWiring.cs`). 비어 있는 필드만 채우고 Undo 가능. 실행 후 씬 저장 필요.
 - 기기 검증(Android/Quest 빌드)은 실제로 실행한 경우에만 결과를 기록한다. 실행하지 않은 검증을 통과로 보고하지 않는다.
 - 새로운 명령을 이 문서에 추가할 때는 실제로 확인된 것만, 실행 여부와 성공 여부를 구분해 기록한다.
 
@@ -74,6 +78,8 @@
 - `applicationIdentifier`가 템플릿 기본값(`com.DefaultCompany.VRTemplate`), `companyName`이 `DefaultCompany`이다. 배포 전 변경 여부는 사용자 결정 사항이다.
 - `ForBuild_BackUpThisFolder_ButDontShipItWithYourGame/`가 Git에 추적되고 있다. 의도된 것인지 확인 전까지는 그대로 둔다.
 - 주 대상 기기(Meta Quest / Android XR)는 설정상 둘 다 가능하며 확정되지 않았다.
+- `Assets/Sprites/53412876-bowling-score-sheet-...jpg`(점수판 Canvas에 사용 중)는 123RF 워터마크가 있는 스톡 미리보기 이미지다(2026-10-21 확인). 라이선스 없이 배포 빌드에 포함하면 안 된다. 교체 여부는 사용자 결정 사항.
+- `Assets/ThirdParty/Neon/PackCyanBlue`는 "as-is 재배포·타 사이트 업로드 금지" 라이선스다. GitHub 원격(`origin`)이 공개 저장소라면 커밋 전에 확인이 필요하다.
 
 ## 완료 보고
 - 실제 변경 사항과 수행한 검증을 간단히 설명한다.

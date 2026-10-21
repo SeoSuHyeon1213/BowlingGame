@@ -21,8 +21,9 @@ public class PauseMenu : MonoBehaviour
     public float panelHeightOffset = -0.1f;
 
     [Header("Input")]
-    [Tooltip("일시 정지 열기/닫기 액션(예: XRI Left/Menu). 비우면 UI 버튼과 Editor의 Esc 키로만 연다.")]
-    public InputActionReference pauseAction;
+    [Tooltip("일시 정지 열기/닫기 액션. 기본값은 왼손 컨트롤러 메뉴 버튼. 다른 액션 에셋을 쓰려면 Use Reference로 바꿔 연결한다.")]
+    public InputActionProperty pauseAction = new InputActionProperty(
+        new InputAction("Pause", InputActionType.Button, "<XRController>{LeftHand}/{MenuButton}"));
 
     [Header("Buttons")]
     public Button resumeButton;
@@ -69,18 +70,22 @@ public class PauseMenu : MonoBehaviour
 
     void OnEnable()
     {
-        if (pauseAction != null && pauseAction.action != null)
+        InputAction action = pauseAction.action;
+        if (action != null)
         {
-            pauseAction.action.performed += OnPauseAction;
-            pauseAction.action.Enable();
+            action.performed += OnPauseAction;
+            action.Enable();
         }
     }
 
     void OnDisable()
     {
-        if (pauseAction != null && pauseAction.action != null)
+        InputAction action = pauseAction.action;
+        if (action != null)
         {
-            pauseAction.action.performed -= OnPauseAction;
+            action.performed -= OnPauseAction;
+            // 에셋에서 참조한 액션은 다른 곳에서도 쓰므로 직접 만든(embedded) 액션만 끈다.
+            if (pauseAction.reference == null) action.Disable();
         }
     }
 

@@ -141,3 +141,100 @@ This is a general-purpose example. At the start of a task, define the goal and c
 - Pause uses `Time.timeScale = 0` (physics, GameManager timers and coroutines stop). Audio keeps playing so volume changes can be heard.
 - Listeners are added in code, so `start`/`quit` OnClick lists can stay empty (adding them in the Inspector too would call twice).
 - Raising the slider above 0 while muted unmutes.
+
+---
+
+# Task: 80s neon UI (BowlingScene / TutorialScene)
+
+## Goal and Scope
+- Goal: Restyle the `Paused` window and the score `Canvas` in both scenes as 80s neon signs using the free assets in `Assets/ThirdParty/Neon/` (+ RETROWAVE SKIES Lite).
+- Work targets: `NeonFlicker.cs` (new); SVG recolor; scene UI changes in Unity Editor (user).
+
+## Current Status
+- Phase: Assets reviewed, flicker script written, SVGs recolored. Scene restyle pending (Editor).
+- Next action: Texture import settings → Paused window → score Canvas → (optional) wall signs/skybox. Fonts (Monoton / Tilt Neon) not downloaded yet.
+
+## Actions
+- [x] Reviewed downloads: Cyan UI pack (buttons with baked labels: Resume/Exit/Start/…, Sound On/Off icons; no panel/slider art), Neon Sign pack (20 animated signs: OPEN/CLOSE, food/drink, abstract — none bowling-specific), SVGRepo icons, RETROWAVE SKIES Lite.
+- [x] `NeonFlicker`: pulse + random flicker for Graphic/SpriteRenderer, unscaled time (works while paused).
+- [x] `bowling-pin-svgrepo-com.svg` fill and `bowling-svgrepo-com.svg` stroke → #FFFFFF so they can be tinted.
+- [ ] Texture import: Cyan pack → Sprite (2D and UI), Bilinear, mipmaps on; Sign pack → Sprite, Point, mipmaps off.
+- [ ] Paused: World Space; start → Resume_button, quit → Exit_button (delete child label text); mute → Sound_On/Off icons via `PauseMenu.soundOnSprite/soundOffSprite`; slider colors; title TMP glow.
+- [ ] Score Canvas: replace 123RF image with dark panel + TMP (GameManager `scoreText` / `scoreBoardText` / `statusText`).
+- [ ] Same changes in TutorialScene.
+- [ ] Delete the two `.zip` files from `Assets/ThirdParty/Neon/` (already extracted) — user decision.
+
+## Verification Record
+| Check | Command or method | Result | Reason for not running or failure |
+|---|---|---|---|
+| Asset contents | Contact sheets rendered with PIL from the PNGs (scratchpad) | Reviewed | |
+| Licenses | Read `License.txt` (Cyan: commercial OK, no redistribution as-is) and sign pack Read Me (CC0) | Confirmed | |
+| Scene UI structure | YAML parse (read-only): both scenes have `Paused` (Screen Space Overlay) + `Canvas` (World Space) with score image + `Score: 0` TMP | Confirmed | |
+| Unity compile / Play | Unity Editor | Not run | Editor not available to Claude |
+
+## Key Decisions
+- Neon glow from TMP Glow/Outline and sprite art (no post-process Bloom) — cheaper on Quest/Android.
+- Flicker uses unscaled time because the pause menu sets `Time.timeScale = 0`.
+- Sign animations: use Unity's drag-frames-into-scene auto animation instead of a custom animator script.
+
+## Remaining Work / Limitations
+- Score sheet image is a watermarked 123RF preview — must not ship without a license.
+- Cyan pack license forbids redistribution; check whether the GitHub repo is public before committing it.
+- Neon fonts not yet in project; Cyan pack and fonts have no Hangul.
+
+---
+
+# Task: Wire unconnected scripts (BowlingScene / TutorialScene)
+
+## Goal and Scope
+- Goal: Connect scripts that exist but are not attached/assigned in the scenes.
+- Approach: Editor menu script (`Tools > Bowling > Wire Open Scene`) because the Unity CLI could not drive the open Editor (Pipeline package not installed; adding packages needs user approval) and scene YAML must not be hand-edited.
+
+## Found (read-only YAML parse, 2026-10-21)
+- BowlingScene: 2 lanes (`Ball`/`Ball (1)`, `Ball Stand`/`Ball Stand (1)`, `Untitled/BowlingPin (1)`/`(2)` each with PinSetter + 10 BowlingPin, `Canvas/P1`/`P2`). Missing: BowlingBall, BallReturnZone, PauseMenu; `GameManager.pinSetter` empty; `Paused` is Screen Space Overlay.
+- TutorialScene: 1 ball (`Bowling Club/Ball`), pin groups with 1 pin each and no PinSetter, `BallCollector` trigger. Missing: BowlingBall, BallReturnZone, PauseMenu.
+- XRI Default Input Actions has no Menu action.
+
+## Actions
+- [x] `GameManager.ball` filter (ignore throws from other lanes' balls).
+- [x] `PauseMenu.pauseAction` → `InputActionProperty` with default embedded binding `<XRController>{LeftHand}/{MenuButton}`.
+- [x] `Editor/BowlingSceneWiring.cs`: BowlingBall + return point at ball start, BallReturnZone on `Cube`/`Cube (2)`/`BallCollector`, GameManager.ball/pinSetter (same lane by geometry)/scoreText, PauseMenu on GameManager with panel/buttons/slider/mute Button/icons, Paused → World Space, NeonFlicker on title; collector-coverage warning per lane.
+- [ ] User: run menu in BowlingScene → check Console log → Ctrl+S; same in TutorialScene.
+- [ ] Play-test both scenes.
+
+## Verification Record
+| Check | Command or method | Result | Reason for not running or failure |
+|---|---|---|---|
+| Compile (all Assets/Scripts incl. Editor) | `dotnet build` of scratch csproj with Unity's references (see CLAUDE.md) | Pass, 0 errors | |
+| Unity CLI live control | `unity status` | Not available | Pipeline package not installed (STATUS_NO_INSTANCES) |
+| Wiring result | Menu run in Editor | Not run | Requires user click in Editor |
+| Play mode | Unity Editor | Not run | |
+
+## Remaining Work / Limitations
+- TutorialScene has no 10-pin PinSetter → scoring off there (GameManager warns on throw). Needs a decision on the tutorial's purpose.
+- Lane 2 (`Ball (1)`) gets ball return only; its score/turns come with step 2 (multi-player).
+- Collector `Cube (2)` may not cover both lanes — the menu logs a warning if not.
+- `scoreBoardText`, `statusText`, `resultPanel`, `resultText` have no UI objects yet.
+
+---
+
+# Task: Main game start button in TutorialScene
+
+## Goal and Scope
+- Goal: Practice in TutorialScene, then press a button to start the main game in BowlingScene.
+- Work targets: `SceneStartButton.cs` (new), `Editor/MainGameStartButtonMenu.cs` (new); scene/build changes via Editor menu (user runs).
+
+## Actions
+- [x] `SceneStartButton`: Button → `LoadSceneAsync(sceneName)`; checks Build Settings, blocks double press, resets timeScale, saves PlayerPrefs.
+- [x] Menu `Tools > Bowling > Create Main Game Start Button`: World Space canvas (0.6 m) with TrackedDeviceGraphicRaycaster, "MAIN GAME" label (NeonFlicker), Start_button sprite (fallback: plain neon button), placed in front of Main Camera.
+- [x] Menu `Tools > Bowling > Set Build Order (Tutorial → Bowling)`.
+- [ ] User: open TutorialScene → Create button → move it → Ctrl+S; run Set Build Order.
+- [ ] Play-test: press button in VR → BowlingScene loads.
+
+## Verification Record
+| Check | Command or method | Result | Reason for not running or failure |
+|---|---|---|---|
+| EventSystem + XRUIInputModule in TutorialScene | YAML GUID count | Present | |
+| Build Settings | `ProjectSettings/EditorBuildSettings.asset` | TutorialScene not listed; BowlingScene enabled | |
+| Compile | scratch `dotnet build` | Pass, 0 errors | |
+| Scene load in Play mode / device | Editor / headset | Not run | Needs user to run menus |

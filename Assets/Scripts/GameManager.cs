@@ -14,6 +14,8 @@ public class GameManager : MonoBehaviour
 
     [Header("Lane")]
     public PinSetter pinSetter;
+    [Tooltip("이 레인의 공. 지정하면 다른 레인의 공 투구는 무시한다. 비우면 모든 공을 받는다.")]
+    public BowlingBall ball;
 
     [Header("UI (선택 사항)")]
     public TextMeshProUGUI scoreText;
@@ -80,9 +82,10 @@ public class GameManager : MonoBehaviour
         UpdateUI();
     }
 
-    public void OnBallThrown(BowlingBall ball)
+    public void OnBallThrown(BowlingBall thrownBall)
     {
         if (State != GameState.Ready) return;
+        if (ball != null && thrownBall != ball) return;
 
         if (pinSetter == null)
         {
@@ -90,7 +93,7 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        currentBall = ball;
+        currentBall = thrownBall;
         rollStartTime = Time.time;
         standingBeforeRoll = pinSetter.CountStanding();
         State = GameState.Rolling;
@@ -98,9 +101,9 @@ public class GameManager : MonoBehaviour
     }
 
     // 굴러가던 공을 다시 손으로 잡으면 이번 투구는 없던 것으로 한다.
-    public void OnBallGrabbed(BowlingBall ball)
+    public void OnBallGrabbed(BowlingBall grabbedBall)
     {
-        if (State == GameState.Rolling && ball == currentBall)
+        if (State == GameState.Rolling && grabbedBall == currentBall)
         {
             currentBall = null;
             State = GameState.Ready;
@@ -108,9 +111,9 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    public void OnBallCollected(BowlingBall ball)
+    public void OnBallCollected(BowlingBall collectedBall)
     {
-        if (State != GameState.Rolling || ball != currentBall) return;
+        if (State != GameState.Rolling || collectedBall != currentBall) return;
 
         State = GameState.Settling;
         StartCoroutine(ResolveRollRoutine());
