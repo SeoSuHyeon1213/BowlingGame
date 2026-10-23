@@ -15,6 +15,8 @@ public class BowlingPin : MonoBehaviour
     private Quaternion startRotation;
     private Vector3 localUpAtStart;
 
+    public Vector3 StartPosition => startPosition;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody>();

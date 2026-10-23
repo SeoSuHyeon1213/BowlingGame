@@ -82,6 +82,16 @@ public class BowlingBall : MonoBehaviour
         }
     }
 
+    // 투구 중 핀에 부딪히면 충돌 지점에 이펙트를 띄운다.
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (BowlingEffects.Instance == null || GameManager.Instance == null) return;
+        if (GameManager.Instance.State != GameManager.GameState.Rolling) return;
+        if (collision.collider.GetComponentInParent<BowlingPin>() == null) return;
+
+        BowlingEffects.Instance.PlayPinHit(collision.GetContact(0).point);
+    }
+
     public void ReturnToRack()
     {
         if (isReturning)

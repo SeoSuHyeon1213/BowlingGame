@@ -16,6 +16,7 @@ using UnityEngine.XR.Interaction.Toolkit.Interactors;
 public static class BowlingSceneWiring
 {
     const string IconFolder = "Assets/ThirdParty/Neon/PackCyanBlue/PackCyanBlue/Png Files/Icons/";
+    const string CfxrFolder = "Assets/JMO Assets/Cartoon FX Remaster/CFXR Prefabs/";
     static readonly string[] ReturnZoneNames = { "Cube", "Cube (2)", "BallCollector" };
 
     [MenuItem("Tools/Bowling/Wire Open Scene")]
@@ -34,6 +35,7 @@ public static class BowlingSceneWiring
         WireReturnZones(scene, balls, laneDir, log);
         GameManager gameManager = WireGameManager(scene, balls, pinSetters, laneDir, log);
         WirePauseMenu(scene, gameManager, log);
+        WireEffects(gameManager, log);
 
         Undo.CollapseUndoOperations(undoGroup);
         EditorSceneManager.MarkSceneDirty(scene);
@@ -221,6 +223,36 @@ public static class BowlingSceneWiring
             Undo.AddComponent<NeonFlicker>(title.gameObject);
             log.AppendLine("+ NeonFlicker added to 'Paused/Image/Text (TMP)'");
         }
+    }
+
+    // 이펙트: GameManager 오브젝트에 BowlingEffects를 붙이고 Cartoon FX Remaster 프리팹을 지정한다.
+    static void WireEffects(GameManager gm, StringBuilder log)
+    {
+        if (gm == null) return;
+
+        BowlingEffects effects = gm.GetComponent<BowlingEffects>();
+        if (effects == null)
+        {
+            effects = Undo.AddComponent<BowlingEffects>(gm.gameObject);
+            log.AppendLine($"+ Added BowlingEffects to '{gm.name}'");
+        }
+
+        WirePrefab(effects, "strikeEffect", CfxrFolder + "Explosions/CFXR4 Firework 1 Cyan-Purple (HDR).prefab", log);
+        WirePrefab(effects, "spareEffect", CfxrFolder + "Texts/CFXR3 _WOW_.prefab", log);
+        WirePrefab(effects, "pinHitEffect", CfxrFolder + "Impacts/CFXR Hit D 3D (Yellow).prefab", log);
+    }
+
+    static void WirePrefab(Object target, string field, string path, StringBuilder log)
+    {
+        if (!IsEmpty(target, field)) return;
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        if (prefab == null)
+        {
+            log.AppendLine($"! Prefab not found at '{path}'. Import Cartoon FX Remaster Free and run again.");
+            return;
+        }
+        SetRef(target, field, prefab);
+        log.AppendLine($"+ {target.GetType().Name}.{field} = {System.IO.Path.GetFileNameWithoutExtension(path)}");
     }
 
     static void WireChild<T>(Object target, string field, GameObject root, string childName, StringBuilder log) where T : Component

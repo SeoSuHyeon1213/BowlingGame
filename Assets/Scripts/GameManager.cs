@@ -135,6 +135,7 @@ public class GameManager : MonoBehaviour
         scoreCard.AddRoll(knocked);
 
         string message = GetRollMessage(knocked, frameBefore, rollBefore);
+        PlayRollEffect(message);
 
         if (scoreCard.IsGameOver)
         {
@@ -168,6 +169,13 @@ public class GameManager : MonoBehaviour
         if (knocked == standingBeforeRoll && !freshRack) return "SPARE!";
         if (knocked == 0) return roll == 1 && frame < BowlingScoreCard.FrameCount ? "Gutter" : "Miss";
         return $"{knocked} pin{(knocked == 1 ? "" : "s")}";
+    }
+
+    private void PlayRollEffect(string message)
+    {
+        if (BowlingEffects.Instance == null) return;
+        if (message == "STRIKE!") BowlingEffects.Instance.PlayStrike(pinSetter.GetRackCenter());
+        else if (message == "SPARE!") BowlingEffects.Instance.PlaySpare(pinSetter.GetRackCenter());
     }
 
     private void ShowResult()

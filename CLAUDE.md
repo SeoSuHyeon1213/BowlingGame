@@ -18,10 +18,10 @@
 ## 주요 디렉터리
 | 경로 | 역할 | 편집 |
 |---|---|---|
-| `Assets/Scripts/` | 프로젝트 자체 게임 코드 (`GameManager`, `BowlingScoreCard`, `PinSetter`, `BowlingPin`, `SoundManager`, `PauseMenu`, `NeonFlicker`, `BowlingBall`, `BallReturnZone`, `SceneStartButton`; `Editor/BowlingSceneWiring`, `Editor/MainGameStartButtonMenu`) | 주 작업 대상 |
+| `Assets/Scripts/` | 프로젝트 자체 게임 코드 (`GameManager`, `BowlingScoreCard`, `PinSetter`, `BowlingPin`, `SoundManager`, `PauseMenu`, `NeonFlicker`, `BowlingBall`, `BallReturnZone`, `SceneStartButton`, `BowlingEffects`; `Editor/BowlingSceneWiring`, `Editor/MainGameStartButtonMenu`) | 주 작업 대상 |
 | `Assets/Scenes/` | 게임 씬 (`BowlingScene` 메인) | Unity Editor에서 편집 |
 | `Assets/Settings/`, `Assets/XR/`, `ProjectSettings/` | URP·XR·프로젝트 설정 | Editor를 통해 변경, 직접 텍스트 편집 지양 |
-| `Assets/Bowling Club/`, `Assets/Sketchfab For Unity/`, `Assets/The combat collection STARTER/`, `Assets/Suggo Creations/` (RETROWAVE SKIES Lite) | 외부 에셋 | 외부 관리 — 직접 수정 금지 |
+| `Assets/Bowling Club/`, `Assets/Sketchfab For Unity/`, `Assets/The combat collection STARTER/`, `Assets/Suggo Creations/` (RETROWAVE SKIES Lite), `Assets/JMO Assets/` (Cartoon FX Remaster Free, 2026-10-23 임포트, `BowlingEffects` 이펙트 프리팹 출처) | 외부 에셋 | 외부 관리 — 직접 수정 금지 |
 | `Assets/ThirdParty/Neon/` | 네온 UI 에셋: Cyan Neon UI Pack(Uryon Games, 재배포 금지 라이선스), Pixel Art Neon Sign Pack(CC0), SVGRepo 볼링 아이콘(핀/공 SVG는 틴트용으로 흰색으로 변경함) | 외부 에셋 — 라이선스 확인 후 사용 |
 | `Assets/Samples/`, `Assets/XRI/`, `Assets/VRTemplateAssets/`, `Assets/CompositionLayers/`, `Assets/TextMesh Pro/` | 패키지 샘플/템플릿/임포트 리소스 | 외부 관리 — 필요 시 복사 후 수정 |
 | `Assets/Libraries/`, `Assets/Resources/` | 용도 미확인 | 편집 전 내용 확인 |
@@ -33,8 +33,8 @@
 - 확인된 CLI 빌드/테스트 명령은 없다. 빌드와 실행은 Unity Editor(6000.6.0f1)에서 프로젝트 루트를 열어 수행한다.
 - 테스트 코드와 asmdef는 현재 없다 (`Assets/` 내 프로젝트 소유 테스트 없음).
 - 스크립트 변경 후 최소 검증: Editor에서 컴파일 오류가 없는지 Console 확인 → `BowlingScene`에서 Play 모드로 동작 확인.
-- Editor 없이 컴파일만 확인하는 방법(2026-10-21 실행, 성공): Unity가 생성한 `Assembly-CSharp-Editor.csproj`의 `<Reference>`(HintPath는 프로젝트 루트 기준 상대 경로이므로 절대 경로로 변환)를 복사한 임시 csproj(netstandard2.1, LangVersion 9.0, DefineConstants 동일)를 scratch 폴더에 만들고 `Assets/Scripts/**/*.cs`를 포함해 `dotnet build`. Unity Editor 컴파일을 대신하지는 않는다(asmdef 분리·Editor 전용 코드 경계 미검증).
-- 씬 연결 자동화: Editor 메뉴 `Tools > Bowling > Wire Open Scene`(`Assets/Scripts/Editor/BowlingSceneWiring.cs`). 비어 있는 필드만 채우고 Undo 가능. 실행 후 씬 저장 필요.
+- Editor 없이 컴파일만 확인하는 방법(2026-10-21 실행, 성공): Unity가 생성한 `Assembly-CSharp-Editor.csproj`의 `<Reference>`(HintPath는 프로젝트 루트 기준 상대 경로이므로 절대 경로로 변환)를 복사한 임시 csproj(netstandard2.1, LangVersion 9.0, DefineConstants 동일)를 scratch 폴더에 만들고 `Assets/Scripts/**/*.cs`를 포함해 `dotnet build`. HintPath에 `NetStandard`·`MonoBleedingEdge`가 들어간 프레임워크 참조는 SDK 참조와 충돌하므로 빼고, `GenerateAssemblyInfo`는 false로 둔다(2026-10-23 확인). Unity Editor 컴파일을 대신하지는 않는다(asmdef 분리·Editor 전용 코드 경계 미검증).
+- 씬 연결 자동화: Editor 메뉴 `Tools > Bowling > Wire Open Scene`(`Assets/Scripts/Editor/BowlingSceneWiring.cs`). 비어 있는 필드만 채우고 Undo 가능. 실행 후 씬 저장 필요. GameManager 오브젝트에 `BowlingEffects`가 없으면 추가하고 Cartoon FX 프리팹(스트라이크/스페어/핀 충돌)을 지정한다.
 - 기기 검증(Android/Quest 빌드)은 실제로 실행한 경우에만 결과를 기록한다. 실행하지 않은 검증을 통과로 보고하지 않는다.
 - 새로운 명령을 이 문서에 추가할 때는 실제로 확인된 것만, 실행 여부와 성공 여부를 구분해 기록한다.
 

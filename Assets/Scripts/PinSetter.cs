@@ -30,6 +30,20 @@ public class PinSetter : MonoBehaviour
         return count;
     }
 
+    // 핀들이 처음 세워진 위치의 중심(이펙트 위치용).
+    public Vector3 GetRackCenter()
+    {
+        Vector3 sum = Vector3.zero;
+        int count = 0;
+        foreach (BowlingPin pin in pins)
+        {
+            if (pin == null) continue;
+            sum += pin.StartPosition;
+            count++;
+        }
+        return count > 0 ? sum / count : transform.position;
+    }
+
     public bool AnyPinMoving(float speedThreshold)
     {
         foreach (BowlingPin pin in pins)
