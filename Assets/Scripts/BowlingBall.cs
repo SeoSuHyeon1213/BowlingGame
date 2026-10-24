@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Filtering;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
@@ -25,11 +26,13 @@ public class BowlingBall : MonoBehaviour
     private Rigidbody rb;
     private XRBaseInteractable interactable;
     private bool isReturning = false;
+    private XRSelectFilterDelegate grabFilter;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
         interactable = GetComponent<XRBaseInteractable>();
+        grabFilter = new XRSelectFilterDelegate(CanBeSelected);
     }
 
     void OnEnable()
@@ -38,6 +41,7 @@ public class BowlingBall : MonoBehaviour
         {
             interactable.selectEntered.AddListener(OnSelectEntered);
             interactable.selectExited.AddListener(OnSelectExited);
+            interactable.selectFilters.Add(grabFilter);
         }
     }
 
@@ -47,7 +51,15 @@ public class BowlingBall : MonoBehaviour
         {
             interactable.selectEntered.RemoveListener(OnSelectEntered);
             interactable.selectExited.RemoveListener(OnSelectExited);
+            interactable.selectFilters.Remove(grabFilter);
         }
+    }
+
+    // CPU 차례에는 손으로 잡지 못하게 한다(잡고 있던 공도 놓친다). 소켓 안착은 언제나 허용한다.
+    private bool CanBeSelected(IXRSelectInteractor interactor, IXRSelectInteractable target)
+    {
+        if (interactor is XRSocketInteractor) return true;
+        return GameManager.Instance == null || GameManager.Instance.CanPlayerGrab();
     }
 
     private void OnSelectEntered(SelectEnterEventArgs args)

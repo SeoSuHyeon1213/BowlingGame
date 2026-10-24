@@ -238,3 +238,55 @@ This is a general-purpose example. At the start of a task, define the goal and c
 | Build Settings | `ProjectSettings/EditorBuildSettings.asset` | TutorialScene not listed; BowlingScene enabled | |
 | Compile | scratch `dotnet build` | Pass, 0 errors | |
 | Scene load in Play mode / device | Editor / headset | Not run | Needs user to run menus |
+
+---
+
+# CPU Opponent (2026-10-24)
+
+## Goal and Scope
+- Goal: Player vs CPU on the same lane, alternating every frame. CPU uses its own ball and throws with physics (aim/position/speed + difficulty noise); score comes from the same physics count as the player.
+- Work targets: `Assets/Scripts/CpuBowler.cs` (new), `GameManager.cs` (two score cards, turn switching, `OnBallThrown` returns bool, `CanPlayerGrab`, two-row scoreboard, winner result), `BowlingBall.cs` (select filter blocks hand grabs on CPU turn; socket always allowed).
+- Solo mode is unchanged when `GameManager.cpuBowler` is empty.
+
+## Actions
+- [x] Write `CpuBowler` (aim: 1st ball = front pin + pocketOffset, 2nd ball = center of standing pins; Gaussian aim/position error).
+- [x] GameManager turn system and UI.
+- [x] BowlingBall grab filter for CPU turn.
+- [x] Scene: CPU ball `Cpu Ball` (Rigidbody + SphereCollider + `BowlingBall`, no XRGrabInteractable) — done by user.
+- [x] Scene: `CpuBowler` on GameManager (ball = `Cpu Ball`, throwPoint = `ThroughPoint`), `GameManager.cpuBowler` and `cpuScoreText` (second `P1` TMP) assigned — done by user.
+- [ ] Tune `aimErrorDegrees` / `pocketOffset` / speed in Play mode.
+
+## Scene Audit (2026-10-24, read-only YAML parse of the saved scenes)
+Only the saved `.unity` files were checked; unsaved Editor changes are not visible.
+
+### BowlingScene — not connected
+- [ ] **Lane mismatch**: `GameManager.pinSetter` = `BowlingPin (1)`, but `CpuBowler.pinSetter` = `BowlingPin (2)`. The game counts and resets only `GameManager.pinSetter`, so CPU aims at one rack while the other is scored. Same lane → clear `CpuBowler.pinSetter` (falls back to GameManager's) or set it to `BowlingPin (1)`. Separate lane → needs code (see Implementation below).
+- [ ] **`ThroughPoint`** (CPU throw point): local rotation is identity under its parent, so its blue axis may not face the pins (pins of the two lanes differ in z, which suggests the lanes run along x). Check its position (foul line, lane center of the scored lane) and rotation in the Editor.
+- [ ] **`BowlingBall.returnPoint` empty** on both `Ball (1)` and `Cpu Ball`. With it empty, `ReturnToRack()` returns before `OnBallCollected`, so after a throw the game stays in Rolling forever (timeout only logs a warning). `Cpu Ball` needs an off-lane parking spot; `Ball (1)` needs the point above its socket.
+- [ ] **No `BallReturnZone`** in the scene (collector `Cube (2)` / fall trigger `Cube`). Without it the ball only returns via `rollTimeout` (12 s).
+- [ ] `Cpu Ball`: leftover `RotationAxisLockGrabTransformer` (does nothing without XRGrabInteractable) — remove.
+- [ ] `GameManager` UI fields empty: `scoreBoardText`, `statusText`, `resultPanel`, `resultText` (no CPU scoreboard rows, turn text, or winner screen will show).
+- [ ] No `BowlingEffects` (strike/spare/pin-hit effects) and no `PauseMenu` in the scene. `Tools > Bowling > Wire Open Scene` adds both plus the return zones and the player ball's return point (only fills empty fields).
+- [ ] Former lane-1 ball `Ball` appears to have become `Cpu Ball`; only `Ball (1)` is grabbable. Confirm `GameManager.ball` (`Ball (1)`) is on the same lane as `GameManager.pinSetter`.
+
+### TutorialScene — not connected
+- [ ] `GameManager.pinSetter` and `ball` empty; no `BowlingBall`, `BallReturnZone`, `PinSetter`, `PauseMenu`. Pin groups have 1 pin each (no 10-pin rack). Decide what the tutorial should score (if anything) before wiring.
+- [ ] `SceneStartButton` is present; TutorialScene still not in Build Settings (run `Tools > Bowling > Set Build Order`).
+
+### Implementation still needed (code)
+- [ ] Decide CPU lane: same lane (current code) or CPU on the neighboring lane (needs a `PinSetter` per bowler in GameManager).
+- [ ] Optional: let a roll resolve even when `returnPoint` is empty (currently stalls the game).
+- [ ] Difficulty selection (UI or preset enum) — only raw Inspector values now.
+- [ ] Restart button on the result panel → `GameManager.StartNewGame` (UI object does not exist yet).
+- [ ] Player position/camera during the CPU turn — not designed yet.
+
+## Verification Record
+| Check | Command or method | Result | Reason for not running or failure |
+|---|---|---|---|
+| Compile | Temp csproj + `dotnet build` (CLAUDE.md method) | Pass (0 errors) | |
+| Unity Editor compile | Unity Console | Not run | Editor not driven from Claude |
+| Play mode: turns, CPU throw, scoring | Unity Editor | Not run | Scene wiring pending |
+
+## Known Limits
+- If the player is holding their ball when the CPU turn starts, the grab filter makes them drop it.
+- Scoreboard text gets 4 characters wider in CPU mode (labels `YOU `/`CPU `); check that it fits the Canvas.
