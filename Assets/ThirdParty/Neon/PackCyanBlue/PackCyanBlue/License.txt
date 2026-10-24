@@ -1,0 +1,22 @@
+=====================================
+Cyan Blue Neon Arcade UI Pack – LICENSE
+=====================================
+
+You are free to:
+
+✔ Use these assets in personal and commercial projects  
+✔ Modify or adapt the assets for your own needs  
+✔ Include the assets inside a final game build (paid or free)  
+
+You may NOT:
+
+✖ Redistribute the assets as-is  
+✖ Upload or share the files on other websites  
+✖ Include the assets in other free or paid asset packs  
+✖ Claim the artwork as your own creation  
+
+Attribution is not required, but always appreciated:  
+"UI Pack by Uryon Games – Created by Sophie Wodey"
+
+Copyright © 2025 Uryon Games  
+All rights reserved.
