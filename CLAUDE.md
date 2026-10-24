@@ -79,7 +79,7 @@
 - `ForBuild_BackUpThisFolder_ButDontShipItWithYourGame/`가 Git에 추적되고 있다. 의도된 것인지 확인 전까지는 그대로 둔다.
 - 주 대상 기기(Meta Quest / Android XR)는 설정상 둘 다 가능하며 확정되지 않았다.
 - `Assets/Sprites/53412876-bowling-score-sheet-...jpg`(점수판 Canvas에 사용 중)는 123RF 워터마크가 있는 스톡 미리보기 이미지다(2026-10-21 확인). 라이선스 없이 배포 빌드에 포함하면 안 된다. 교체 여부는 사용자 결정 사항.
-- `Assets/ThirdParty/Neon/PackCyanBlue`는 "as-is 재배포·타 사이트 업로드 금지" 라이선스다. GitHub 원격(`origin`)이 공개 저장소라면 커밋 전에 확인이 필요하다.
+- `Assets/ThirdParty/Neon/PackCyanBlue`(Cyan Neon UI Pack)와 `Assets/DownloadedAssets/bowlingSet/LowPolyBowlingBilliardsPack_v1.0`은 에셋 파일 재배포 금지 라이선스다. GitHub 원격(`origin`)은 비공개 저장소이며(2026-10-24 사용자 확인) 두 폴더 모두 커밋·푸시되어 있다. 저장소를 공개로 바꾸기 전에는 이 두 폴더를 히스토리에서 제거해야 한다.
 
 ## 완료 보고
 - 실제 변경 사항과 수행한 검증을 간단히 설명한다.
