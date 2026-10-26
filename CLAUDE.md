@@ -3,7 +3,7 @@
 이 문서는 프로젝트 루트의 `AGENTS.md`(범용 작업 지침)를 바탕으로, 이 프로젝트에서 확인한 사실을 채워 넣은 Claude용 작업 지침입니다. 이 디렉터리와 하위 디렉터리 전체에 적용됩니다. 지속적인 규칙은 이 문서(및 `AGENTS.md`)에, 현재 작업 상태는 `CHECKLIST.md`에 기록합니다.
 
 ## 프로젝트 정보 (2026-10-14 설정 파일로 확인)
-- 목적: VR 볼링 게임. 현재 솔로 10프레임 1게임을 지원한다(`GameManager` 상태 머신 + `BowlingScoreCard` 표준 점수 규칙). 핀 쓰러짐은 투구가 끝나고 핀이 멈춘 뒤 기울기/낙하로 판정하며(`BowlingPin.IsKnockedDown`), `Floor` 태그 접촉은 효과음에만 쓴다. `GameManager.cpuBowler`를 지정하면 같은 레인에서 플레이어와 CPU가 프레임마다 번갈아 던진다(2026-10-24 추가, `CpuBowler`가 전용 공을 조준 오차를 섞어 물리로 굴림 — 결과를 미리 정하지 않음, CPU 차례에는 플레이어 공 잡기를 막음). 계획: 이후 대 온라인 1:1 모드 추가.
+- 목적: VR 볼링 게임. 현재 솔로 10프레임 1게임을 지원한다(`GameManager` 상태 머신 + `BowlingScoreCard` 표준 점수 규칙). 핀 쓰러짐은 투구가 끝나고 핀이 멈춘 뒤 기울기/낙하로 판정하며(`BowlingPin.IsKnockedDown`), `Floor` 태그 접촉은 효과음에만 쓴다. `GameManager.cpuBowler`를 지정하면 같은 레인에서 플레이어와 CPU가 프레임마다 번갈아 던진다(2026-10-24 추가, `CpuBowler`가 전용 공을 조준 오차를 섞어 물리로 굴림 — 결과를 미리 정하지 않음, CPU 차례에는 플레이어 공 잡기를 막음). 온라인 1:1(2026-10-26 1단계): Netcode for GameObjects `2.13.3` + Multiplayer Services `2.4.1`(Sessions + Relay, 익명 로그인). `TutorialScene`의 `Online Lobby` QUICK MATCH → 2명이 모이면 호스트가 `BowlingScene`을 네트워크 로드, `NetworkedXRAvatar`로 머리·손 동기화. 투구·점수·핀은 아직 동기화하지 않는다(진행 상황은 `CHECKLIST.md` 온라인 섹션).
 - 공 회수 방식: 핀 뒤 수거 트리거(`Cube (2)`) 또는 맵 아래 낙하 트리거(루트 `Cube`)에 공이 들어오면(`BallReturnZone`) 공을 지정된 복귀 위치로 옮기고(`BowlingBall.returnPoint`), 공은 거기서 굴러가 `Ball Stand` 아래 큐브의 `XRSocketInteractor`에 안착한다. 안착은 코드로 강제하지 않고 소켓에 맡긴다.
 - 엔진: Unity `6000.6.0f1` (`ProjectSettings/ProjectVersion.txt`)
 - 렌더 파이프라인: URP `17.6.0`
@@ -19,7 +19,7 @@
 ## 주요 디렉터리
 | 경로 | 역할 | 편집 |
 |---|---|---|
-| `Assets/Scripts/` | 프로젝트 자체 게임 코드 (`GameManager`, `BowlingScoreCard`, `PinSetter`, `BowlingPin`, `SoundManager`, `PauseMenu`, `NeonFlicker`, `BowlingBall`, `BallReturnZone`, `CpuBowler`, `SceneStartButton`, `BowlingEffects`, `TutorialManager`; `Editor/BowlingSceneWiring`, `Editor/MainGameStartButtonMenu`) | 주 작업 대상 |
+| `Assets/Scripts/` | 프로젝트 자체 게임 코드 (`GameManager`, `BowlingScoreCard`, `PinSetter`, `BowlingPin`, `SoundManager`, `PauseMenu`, `NeonFlicker`, `BowlingBall`, `BallReturnZone`, `CpuBowler`, `SceneStartButton`, `BowlingEffects`, `TutorialManager`, `OnlineSessionManager`, `NetworkedXRAvatar`, `OnlineSpawnPoints`, `OnlineLobbyPanel`; `Editor/BowlingSceneWiring`, `Editor/MainGameStartButtonMenu`, `Editor/OnlineMultiplayerMenu`) | 주 작업 대상 |
 | `Assets/Scenes/` | 게임 씬 (`BowlingScene` 메인) | Unity Editor에서 편집 |
 | `Assets/Settings/`, `Assets/XR/`, `ProjectSettings/` | URP·XR·프로젝트 설정 | Editor를 통해 변경, 직접 텍스트 편집 지양 |
 | `Assets/Bowling Club/`, `Assets/Sketchfab For Unity/`, `Assets/The combat collection STARTER/`, `Assets/Suggo Creations/` (RETROWAVE SKIES Lite), `Assets/JMO Assets/` (Cartoon FX Remaster Free, 2026-10-23 임포트, `BowlingEffects` 이펙트 프리팹 출처) | 외부 에셋 | 외부 관리 — 직접 수정 금지 |
@@ -34,6 +34,9 @@
 - 확인된 CLI 빌드/테스트 명령은 없다. 빌드와 실행은 Unity Editor(6000.6.0f1)에서 프로젝트 루트를 열어 수행한다.
 - 테스트 코드와 asmdef는 현재 없다 (`Assets/` 내 프로젝트 소유 테스트 없음).
 - 스크립트 변경 후 최소 검증: Editor에서 컴파일 오류가 없는지 Console 확인 → `BowlingScene`에서 Play 모드로 동작 확인.
+- 온라인 씬 구성(2026-10-26 실행, 성공): 메뉴 `Tools > Bowling > Online > Add Online Lobby To Open Scene`(TutorialScene: `Online Session` = NetworkManager + UnityTransport + `OnlineSessionManager`, `Online Lobby` 패널), `Add Spawn Points To Open Scene`(BowlingScene), `Create Avatar Prefab`(`Assets/PreFab/NetworkAvatar.prefab`). 이미 있으면 새로 만들지 않는다. UGS 클라우드 프로젝트(`cloudProjectId`)가 연결되어 있어야 로그인이 된다. `Online Session`은 로비 씬에만 둔다(DontDestroyOnLoad로 게임 씬까지 유지).
+- 온라인 2인 테스트(2026-10-26 실행, 성공): Multiplayer Play Mode(`com.unity.multiplayer.playmode` 3.0.0)의 Player 2 클론 Editor를 켜면 `unity status`에 별도 포트로 표시되고, `unity command --project-path <프로젝트>/Library/VP/<클론ID> ...`로 클론을 조작할 수 있다. 두 Editor 모두 `TutorialScene`을 연 뒤 Play → 각각 QUICK MATCH. 클론은 메인 Editor에서 저장하지 않은 씬 변경을 받지 못한다. 자세한 절차는 `CHECKLIST.md` 온라인 섹션.
+- 실행 중 Editor에서 패키지 추가(2026-10-26 실행, 성공): `UnityEditor.PackageManager.Client.AddAndRemove(...)`를 `unity command eval_file`로 호출. batchmode 설치 스크립트는 Editor가 프로젝트를 열고 있으면 실패하고, `EditorApplication.Exit`를 부르므로 열린 Editor에서 실행하면 안 된다.
 - Editor 없이 컴파일만 확인하는 방법(2026-10-21 실행, 성공): Unity가 생성한 `Assembly-CSharp-Editor.csproj`의 `<Reference>`(HintPath는 프로젝트 루트 기준 상대 경로이므로 절대 경로로 변환)를 복사한 임시 csproj(netstandard2.1, LangVersion 9.0, DefineConstants 동일)를 scratch 폴더에 만들고 `Assets/Scripts/**/*.cs`를 포함해 `dotnet build`. HintPath에 `NetStandard`·`MonoBleedingEdge`·`UnityReferenceAssemblies`가 들어간 프레임워크 참조는 SDK 참조와 충돌하므로 빼고, `GenerateAssemblyInfo`는 false로 둔다(2026-10-23 확인, `UnityReferenceAssemblies` 제외는 2026-10-24 확인 — 빼지 않으면 mscorlib 충돌로 CS0518). Unity Editor 컴파일을 대신하지는 않는다(asmdef 분리·Editor 전용 코드 경계 미검증).
 - 씬 연결 자동화: Editor 메뉴 `Tools > Bowling > Wire Open Scene`(`Assets/Scripts/Editor/BowlingSceneWiring.cs`). 비어 있는 필드만 채우고 Undo 가능. 실행 후 씬 저장 필요. GameManager 오브젝트에 `BowlingEffects`가 없으면 추가하고 Cartoon FX 프리팹(스트라이크/스페어/핀 충돌)을 지정한다.
 - 실행 중인 Editor 조회(2026-10-26 실행, 성공): `unity pipeline install`로 `com.unity.pipeline`(0.9.1-exp.1)을 `Packages/manifest.json`에 추가했다. 이후 `unity status`로 연결을 확인하고, `unity command editor.playmode start`로 Play를 시작하며, `unity command eval_file --result-only -- "<경로>.cs"`로 C#을 실행한다. eval 코드는 메서드 본문만 받으므로 `using`을 쓸 수 없고 타입을 전체 이름으로 적어야 하며, 마지막에 `return`으로 결과를 돌려준다. 이 방법으로 Input System 컨트롤의 값(grip, devicePosition 등)을 읽으면 Play 중에도 0이 나왔다. 컨트롤 값은 신뢰하지 말고 Transform이나 인터랙터 상태로 판단한다.

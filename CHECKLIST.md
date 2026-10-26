@@ -290,3 +290,59 @@ Only the saved `.unity` files were checked; unsaved Editor changes are not visib
 ## Known Limits
 - If the player is holding their ball when the CPU turn starts, the grab filter makes them drop it.
 - Scoreboard text gets 4 characters wider in CPU mode (labels `YOU `/`CPU `); check that it fits the Canvas.
+
+---
+
+# 온라인 1:1 — 1단계: 로비/릴레이 접속 + 아바타 동기화 (2026-10-26)
+
+## 목표와 범위
+- 목표: 두 기기가 Unity Gaming Services 세션(Relay)으로 2인 대전에 접속하고, 두 명이 모이면 호스트가 `BowlingScene`을 네트워크로 함께 열며, 서로의 머리·양손 위치가 보인다.
+- 범위 밖(2단계 이후): 차례·점수 동기화, 공/핀 물리 동기화, 방 코드 입력 UI, 재접속.
+- 완료 기준: Editor 컴파일 오류 없음, 단일 인스턴스에서 세션 생성·대기·나가기 동작, 두 인스턴스(또는 기기 2대)에서 씬 이동과 아바타 표시 확인.
+
+## 결정 사항
+- 스택: Netcode for GameObjects `2.13.3` + Multiplayer Services `2.4.1`(Sessions API, `WithRelayNetwork`). 세션 생성/참가가 NGO Host/Client를 자동으로 시작한다.
+- 호스트-클라이언트 구조이며, 호스트(ClientId 0)가 자리 0번, 참가자가 1번이다.
+- 아바타는 `NetworkVariable<AvatarPose>`(Owner 쓰기 권한)로 동기화한다. 초당 20회 보내고, 받는 쪽은 보간한다. 자기 아바타는 렌더러를 끈다. 아바타에는 충돌체가 없다.
+- 네트워크 오브젝트(`Online Session`)는 DontDestroyOnLoad로 유지한다. 나가거나 연결이 끊기면 이 오브젝트를 지우고 `TutorialScene`을 다시 불러온다. 이렇게 해야 NetworkManager가 둘이 되지 않는다.
+
+## 작업
+- [x] 패키지 추가: `com.unity.netcode.gameobjects`, `com.unity.services.multiplayer` (실행 중 Editor에서 `Client.AddAndRemove`)
+- [x] `OnlineSessionManager.cs`: 익명 로그인, 빠른 매칭(없으면 생성), 비공개 방 생성/코드 참가 API, 2명이 모이면 `BowlingScene` 네트워크 로드, 나가기/끊김 시 로비 복귀
+- [x] `NetworkedXRAvatar.cs`: XR Origin의 `Main Camera`, `Left/Right Controller`(없으면 `Left/Right Hand`) 위치 전송, 게임 씬에서 자기 자리로 리그 이동
+- [x] `OnlineSpawnPoints.cs`, `OnlineLobbyPanel.cs`(QUICK MATCH / CANCEL / 상태 문구, 접속 중 `Main Game Start` 버튼 비활성)
+- [x] `Editor/OnlineMultiplayerMenu.cs`: `Tools > Bowling > Online > Create Avatar Prefab / Add Online Lobby To Open Scene / Add Spawn Points To Open Scene`
+- [x] `Assets/PreFab/NetworkAvatar.prefab` 생성, `TutorialScene`에 `Online Session`·`Online Lobby` 추가, `BowlingScene`에 `Online Spawn Points` 추가(Guest Spot = 호스트 자리 오른쪽 1m), 빌드 순서 Tutorial → Bowling
+- [ ] `Guest Spot` 위치를 실제 레인 배치에 맞게 조정(현재 자동 배치값)
+- [ ] `Online Lobby` 패널 위치 조정(현재 `Main Game Start` 오른쪽 0.75m)
+- [x] 일시정지 메뉴 등으로 로비 씬(TutorialScene)에 돌아오면 세션을 자동으로 나간다(`OnSceneLoaded`). 단, `PauseMenu.quitSceneName`이 비어 있으면 앱 종료이며 이 경우는 별도 처리 없음
+
+## 검증 기록
+| 항목 | 방법 | 결과 | 비고 |
+|---|---|---|---|
+| Editor 컴파일 | 실행 중 Editor `AssetDatabase.Refresh` → `script recompile_status` | 통과(오류 0, 새 스크립트 경고 0) | |
+| 세션 생성 | Play(TutorialScene) → eval로 `QuickMatch()` | 통과: `Waiting`, 방 코드 발급, Host 시작, 접속 1명, 아바타 1개 생성, 패널 문구/버튼 상태 갱신 | UGS 로그인·Relay 정상 |
+| 아바타 전송(소유자) | eval로 `pose` 값 확인 | 머리 위치 전송됨, 자기 렌더러 0개 표시 | 손은 기기가 없어 컨트롤러 오브젝트가 꺼져 있어 `tracked=false` |
+| 나가기 | eval로 `Leave()` | 통과: `Offline`, NGO 종료, 아바타 제거, 버튼 복구 | |
+| 로비 씬 직접 복귀 → 재매칭 | Play 중 `Waiting`에서 `SceneManager.LoadScene("TutorialScene")` → 다시 `QuickMatch()` | 통과: `Offline`으로 정리, OnlineSessionManager/NetworkManager 각 1개, 재매칭으로 새 방 생성 | |
+| 2인 접속·씬 이동 | MPPM Player 2 클론 + 양쪽 eval로 `QuickMatch()` | 통과: 같은 방 코드로 참가, 호스트 접속 2명, 두 Editor 모두 `BowlingScene`으로 이동, 양쪽 `InGame` | 처음엔 참가자가 `Waiting`에 머묾 → 수정(아래) |
+| 자리 배치 | 위 상태에서 리그 위치 확인 | 통과: 호스트 Host Spot, 참가자 Guest Spot(1m 옆) | |
+| 상대 아바타 표시·추적 | 상대 아바타 head 위치 비교, Player 2 머리 이동/회전 후 Player 1에서 확인 | 통과: 양쪽 모두 상대 머리 위치 일치, 이동(+0.5, -0.3)·회전(Y 90°) 반영, 자기 아바타 렌더러 0개 | 손은 기기 없음으로 미표시 |
+| 참가자 나가기 | 게임 중 Player 2 `Leave()` | 통과: 양쪽 `TutorialScene`·`Offline`, 호스트 문구 "Opponent left the match.", 각 Editor NetworkManager 1개 | |
+| 호스트 나가기 | 게임 중 Player 1 `Leave()` | 통과: 참가자 "Disconnected from the match."로 로비 복귀 | |
+| Quest/Android 기기 | — | 미실행 | |
+
+## 2인 테스트 중 수정
+- 참가자가 게임 씬에 들어와도 상태가 `Waiting`("Starting soon...")에 머물렀다. 원인: 호스트의 씬 동기화가 참가 `await`이 끝나기 전에 끝나 `OnSceneLoaded` 시점에 상태가 아직 `Connecting`이었다. `OnSessionJoined`에서 이미 게임 씬이면 `InGame`으로 바꾸고, `OnSceneLoaded`에서도 `Waiting`→`InGame`을 처리하도록 수정했다.
+
+## 2인 테스트 방법 (Editor, 2026-10-26 확인)
+- 패키지 `com.unity.multiplayer.playmode` 3.0.0(구현은 Editor 내장)을 추가했다. `ProjectSettings/VirtualProjectsConfig.json`은 MPPM이 만든 설정 파일이다.
+- 수동: `Window > Multiplayer > Multiplayer Play Mode`에서 Player 2를 켜고, 두 Editor 모두 `TutorialScene`을 연 상태에서 Play를 누른 뒤 각각 QUICK MATCH를 누른다. 클론은 메인에서 저장하지 않은 씬 변경을 받지 못하므로 씬을 저장한 뒤 실행한다.
+- CLI: 클론은 `unity status`에 별도 포트로 표시된다. `unity command --project-path <프로젝트>/Library/VP/<클론ID> ...`로 클론에 eval/Play 명령을 보낼 수 있다. Player 2 켜기/끄기는 내부 API(`Unity.Multiplayer.PlayMode.Editor.MultiplayerPlaymode.PlayerTwo.Activate/Deactivate`)를 리플렉션으로 호출했다(공개 API 아님, Editor 버전에 따라 바뀔 수 있음).
+
+## 알려진 제한 (1단계)
+- `BowlingScene`의 `GameManager`는 각 기기에서 따로 돈다. CPU가 지정되어 있으면 두 사람 모두 각자 CPU와 게임을 하게 되며, 공·핀은 동기화되지 않는다(2·3단계 작업).
+- 방 코드 참가 UI가 없다(`JoinByCode` API만 있음). 지금은 QUICK MATCH만 쓸 수 있다.
+- 상대가 나가면 남은 사람도 로비로 돌아간다(CPU 교체 없음).
+- 나갈 때 패키지 경고 `GameObjectsNetcodeNetworkHandler.StopAsync: Failed to stop session: session was never started.`가 나온다(세션 나가기 후 NGO Shutdown을 한 번 더 부름). 동작에는 영향 없음.
+- Quest/Android 기기 2대 테스트는 아직 하지 않았다.
