@@ -13,12 +13,13 @@
 - 대상 플랫폼: Android (Min/Target SDK 34), 스크립팅 백엔드 IL2CPP
 - 빌드 씬: `Assets/Scenes/BowlingScene.unity`(활성). `SampleScene.unity`는 빌드 목록에서 비활성.
 - 씬 흐름(계획, 2026-10-21): `TutorialScene`(연습) → "MAIN GAME / START" 버튼(`SceneStartButton`) → `BowlingScene`(메인 게임). 빌드 순서는 메뉴 `Tools > Bowling > Set Build Order (Tutorial → Bowling)`로 맞춘다(실행 전까지 TutorialScene은 빌드 목록에 없음).
+- 튜토리얼 진행(2026-10-26 추가): `TutorialManager`가 `GameManager`와 같은 투구 흐름(투구 → 회수 → 핀 정지 → 집계)으로 단계 안내(공 잡기 → 던지기 → 결과)와 연습 기록을 보여 주고, `throwsToComplete`회 던지면 메인 게임 버튼을 켠다. 점수는 기록하지 않는다. `BowlingBall`은 `GameManager`가 있으면 그쪽에만 알리므로 튜토리얼 씬에는 `GameManager`를 두지 않는다.
 - 패키지 버전의 기준은 `Packages/manifest.json`이며, 위 버전은 이 파일에서 확인했다.
 
 ## 주요 디렉터리
 | 경로 | 역할 | 편집 |
 |---|---|---|
-| `Assets/Scripts/` | 프로젝트 자체 게임 코드 (`GameManager`, `BowlingScoreCard`, `PinSetter`, `BowlingPin`, `SoundManager`, `PauseMenu`, `NeonFlicker`, `BowlingBall`, `BallReturnZone`, `CpuBowler`, `SceneStartButton`, `BowlingEffects`; `Editor/BowlingSceneWiring`, `Editor/MainGameStartButtonMenu`) | 주 작업 대상 |
+| `Assets/Scripts/` | 프로젝트 자체 게임 코드 (`GameManager`, `BowlingScoreCard`, `PinSetter`, `BowlingPin`, `SoundManager`, `PauseMenu`, `NeonFlicker`, `BowlingBall`, `BallReturnZone`, `CpuBowler`, `SceneStartButton`, `BowlingEffects`, `TutorialManager`; `Editor/BowlingSceneWiring`, `Editor/MainGameStartButtonMenu`) | 주 작업 대상 |
 | `Assets/Scenes/` | 게임 씬 (`BowlingScene` 메인) | Unity Editor에서 편집 |
 | `Assets/Settings/`, `Assets/XR/`, `ProjectSettings/` | URP·XR·프로젝트 설정 | Editor를 통해 변경, 직접 텍스트 편집 지양 |
 | `Assets/Bowling Club/`, `Assets/Sketchfab For Unity/`, `Assets/The combat collection STARTER/`, `Assets/Suggo Creations/` (RETROWAVE SKIES Lite), `Assets/JMO Assets/` (Cartoon FX Remaster Free, 2026-10-23 임포트, `BowlingEffects` 이펙트 프리팹 출처) | 외부 에셋 | 외부 관리 — 직접 수정 금지 |
@@ -35,6 +36,7 @@
 - 스크립트 변경 후 최소 검증: Editor에서 컴파일 오류가 없는지 Console 확인 → `BowlingScene`에서 Play 모드로 동작 확인.
 - Editor 없이 컴파일만 확인하는 방법(2026-10-21 실행, 성공): Unity가 생성한 `Assembly-CSharp-Editor.csproj`의 `<Reference>`(HintPath는 프로젝트 루트 기준 상대 경로이므로 절대 경로로 변환)를 복사한 임시 csproj(netstandard2.1, LangVersion 9.0, DefineConstants 동일)를 scratch 폴더에 만들고 `Assets/Scripts/**/*.cs`를 포함해 `dotnet build`. HintPath에 `NetStandard`·`MonoBleedingEdge`·`UnityReferenceAssemblies`가 들어간 프레임워크 참조는 SDK 참조와 충돌하므로 빼고, `GenerateAssemblyInfo`는 false로 둔다(2026-10-23 확인, `UnityReferenceAssemblies` 제외는 2026-10-24 확인 — 빼지 않으면 mscorlib 충돌로 CS0518). Unity Editor 컴파일을 대신하지는 않는다(asmdef 분리·Editor 전용 코드 경계 미검증).
 - 씬 연결 자동화: Editor 메뉴 `Tools > Bowling > Wire Open Scene`(`Assets/Scripts/Editor/BowlingSceneWiring.cs`). 비어 있는 필드만 채우고 Undo 가능. 실행 후 씬 저장 필요. GameManager 오브젝트에 `BowlingEffects`가 없으면 추가하고 Cartoon FX 프리팹(스트라이크/스페어/핀 충돌)을 지정한다.
+- 실행 중인 Editor 조회(2026-10-26 실행, 성공): `unity pipeline install`로 `com.unity.pipeline`(0.9.1-exp.1)을 `Packages/manifest.json`에 추가했다. 이후 `unity status`로 연결을 확인하고, `unity command editor.playmode start`로 Play를 시작하며, `unity command eval_file --result-only -- "<경로>.cs"`로 C#을 실행한다. eval 코드는 메서드 본문만 받으므로 `using`을 쓸 수 없고 타입을 전체 이름으로 적어야 하며, 마지막에 `return`으로 결과를 돌려준다. 이 방법으로 Input System 컨트롤의 값(grip, devicePosition 등)을 읽으면 Play 중에도 0이 나왔다. 컨트롤 값은 신뢰하지 말고 Transform이나 인터랙터 상태로 판단한다.
 - 기기 검증(Android/Quest 빌드)은 실제로 실행한 경우에만 결과를 기록한다. 실행하지 않은 검증을 통과로 보고하지 않는다.
 - 새로운 명령을 이 문서에 추가할 때는 실제로 확인된 것만, 실행 여부와 성공 여부를 구분해 기록한다.
 

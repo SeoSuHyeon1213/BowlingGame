@@ -71,6 +71,10 @@ public class BowlingBall : MonoBehaviour
         {
             GameManager.Instance.OnBallGrabbed(this);
         }
+        else if (TutorialManager.Instance != null)
+        {
+            TutorialManager.Instance.OnBallGrabbed(this);
+        }
     }
 
     private void OnSelectExited(SelectExitEventArgs args)
@@ -88,17 +92,26 @@ public class BowlingBall : MonoBehaviour
 
         if (interactable != null && interactable.isSelected) yield break;
 
-        if (rb.linearVelocity.magnitude >= minThrowSpeed && GameManager.Instance != null)
+        if (rb.linearVelocity.magnitude < minThrowSpeed) yield break;
+
+        if (GameManager.Instance != null)
         {
             GameManager.Instance.OnBallThrown(this);
+        }
+        else if (TutorialManager.Instance != null)
+        {
+            TutorialManager.Instance.OnBallThrown(this);
         }
     }
 
     // 투구 중 핀에 부딪히면 충돌 지점에 이펙트를 띄운다.
     private void OnCollisionEnter(Collision collision)
     {
-        if (BowlingEffects.Instance == null || GameManager.Instance == null) return;
-        if (GameManager.Instance.State != GameManager.GameState.Rolling) return;
+        if (BowlingEffects.Instance == null) return;
+        bool rolling = GameManager.Instance != null
+            ? GameManager.Instance.State == GameManager.GameState.Rolling
+            : TutorialManager.Instance != null && TutorialManager.Instance.State == TutorialManager.RollState.Rolling;
+        if (!rolling) return;
         if (collision.collider.GetComponentInParent<BowlingPin>() == null) return;
 
         BowlingEffects.Instance.PlayPinHit(collision.GetContact(0).point);
@@ -126,6 +139,10 @@ public class BowlingBall : MonoBehaviour
         if (GameManager.Instance != null)
         {
             GameManager.Instance.OnBallCollected(this);
+        }
+        else if (TutorialManager.Instance != null)
+        {
+            TutorialManager.Instance.OnBallCollected(this);
         }
 
         StartCoroutine(ReturnRoutine());

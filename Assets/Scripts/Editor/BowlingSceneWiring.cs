@@ -36,6 +36,7 @@ public static class BowlingSceneWiring
         GameManager gameManager = WireGameManager(scene, balls, pinSetters, laneDir, log);
         WirePauseMenu(scene, gameManager, log);
         WireEffects(gameManager, log);
+        WireTutorialManager(scene, balls, pinSetters, log);
 
         Undo.CollapseUndoOperations(undoGroup);
         EditorSceneManager.MarkSceneDirty(scene);
@@ -222,6 +223,42 @@ public static class BowlingSceneWiring
         {
             Undo.AddComponent<NeonFlicker>(title.gameObject);
             log.AppendLine("+ NeonFlicker added to 'Paused/Image/Text (TMP)'");
+        }
+    }
+
+    // 튜토리얼 씬: TutorialManager의 레인과 메인 게임 버튼("Main Game Start")을 채운다.
+    static void WireTutorialManager(Scene scene, List<BowlingBall> balls, List<PinSetter> pinSetters, StringBuilder log)
+    {
+        TutorialManager tm = FindInScene<TutorialManager>(scene).FirstOrDefault();
+        if (tm == null) return;
+
+        if (FindInScene<GameManager>(scene).Any())
+        {
+            log.AppendLine("! Both GameManager and TutorialManager are in this scene. Remove GameManager — balls report to it first.");
+        }
+
+        BowlingBall mainBall = balls.FirstOrDefault(b => b.name == "Ball") ?? balls.FirstOrDefault();
+        if (SetIfEmpty(tm, "ball", mainBall)) log.AppendLine($"+ TutorialManager.ball = '{mainBall.name}'");
+
+        PinSetter pins = pinSetters.FirstOrDefault();
+        if (pins == null)
+        {
+            log.AppendLine("! No PinSetter in scene — TutorialManager can't count pins.");
+        }
+        else if (SetIfEmpty(tm, "pinSetter", pins))
+        {
+            log.AppendLine($"+ TutorialManager.pinSetter = '{PathOf(pins.transform)}'");
+        }
+
+        if (IsEmpty(tm, "mainGameButton"))
+        {
+            SceneStartButton start = FindInScene<SceneStartButton>(scene).FirstOrDefault();
+            GameObject button = start != null ? start.gameObject : null;
+            if (button != null)
+            {
+                SetRef(tm, "mainGameButton", button);
+                log.AppendLine($"+ TutorialManager.mainGameButton = '{PathOf(button.transform)}'");
+            }
         }
     }
 
