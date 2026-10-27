@@ -10,7 +10,7 @@ public class CpuBowler : MonoBehaviour
     public BowlingBall ball;
     [Tooltip("공을 놓을 위치. 파울 라인 앞 레인 중앙에 두고, 파란 축(forward)이 핀 쪽을 향하게 한다.")]
     public Transform throwPoint;
-    [Tooltip("비우면 GameManager.pinSetter를 쓴다.")]
+    [Tooltip("비우면 GameManager의 2P 레인(opponentPinSetter, 없으면 pinSetter)을 쓴다.")]
     public PinSetter pinSetter;
 
     [Header("Aim")]
@@ -98,7 +98,7 @@ public class CpuBowler : MonoBehaviour
     // 1구(10개 모두 서 있음): 맨 앞 핀 옆 포켓. 2구: 남은 핀들의 중심.
     private Vector3 GetAimPoint(Vector3 forward, Vector3 right)
     {
-        PinSetter pins = pinSetter != null ? pinSetter : GameManager.Instance != null ? GameManager.Instance.pinSetter : null;
+        PinSetter pins = pinSetter != null ? pinSetter : GameManager.Instance != null ? GameManager.Instance.GetPinSetter(1) : null;
         if (pins == null) return throwPoint.position + forward * 18f;
 
         Vector3 sum = Vector3.zero;

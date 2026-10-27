@@ -3,7 +3,7 @@
 이 문서는 프로젝트 루트의 `AGENTS.md`(범용 작업 지침)를 바탕으로, 이 프로젝트에서 확인한 사실을 채워 넣은 Claude용 작업 지침입니다. 이 디렉터리와 하위 디렉터리 전체에 적용됩니다. 지속적인 규칙은 이 문서(및 `AGENTS.md`)에, 현재 작업 상태는 `CHECKLIST.md`에 기록합니다.
 
 ## 프로젝트 정보 (2026-10-14 설정 파일로 확인)
-- 목적: VR 볼링 게임. 현재 솔로 10프레임 1게임을 지원한다(`GameManager` 상태 머신 + `BowlingScoreCard` 표준 점수 규칙). 핀 쓰러짐은 투구가 끝나고 핀이 멈춘 뒤 기울기/낙하로 판정하며(`BowlingPin.IsKnockedDown`), `Floor` 태그 접촉은 효과음에만 쓴다. `GameManager.cpuBowler`를 지정하면 같은 레인에서 플레이어와 CPU가 프레임마다 번갈아 던진다(2026-10-24 추가, `CpuBowler`가 전용 공을 조준 오차를 섞어 물리로 굴림 — 결과를 미리 정하지 않음, CPU 차례에는 플레이어 공 잡기를 막음). 온라인 1:1(2026-10-26 1단계): Netcode for GameObjects `2.13.3` + Multiplayer Services `2.4.1`(Sessions + Relay, 익명 로그인). `TutorialScene`의 `Online Lobby` QUICK MATCH → 2명이 모이면 호스트가 `BowlingScene`을 네트워크 로드, `NetworkedXRAvatar`로 머리·손 동기화. 투구·점수·핀은 아직 동기화하지 않는다(진행 상황은 `CHECKLIST.md` 온라인 섹션).
+- 목적: VR 볼링 게임. 현재 솔로 10프레임 1게임을 지원한다(`GameManager` 상태 머신 + `BowlingScoreCard` 표준 점수 규칙). 핀 쓰러짐은 투구가 끝나고 핀이 멈춘 뒤 기울기/낙하로 판정하며(`BowlingPin.IsKnockedDown`), `Floor` 태그 접촉은 효과음에만 쓴다. `GameManager.cpuBowler`를 지정하면 플레이어와 CPU가 프레임마다 번갈아 던진다. 레인은 1P `pinSetter`(`Untitled/1P Pinsetter`), 2P/CPU `opponentPinSetter`(`Untitled/2P Pinsetter`, 비우면 1P 레인 공유)로 나뉘며 `GameManager.GetPinSetter(0|1)`로 얻는다(2026-10-27). CPU 투구 위치 `Ball Stand (1)/ThroughPoint`는 2P 레인 헤드 핀 줄(z ≈ -21.62)에 있다(2026-10-24 추가, `CpuBowler`가 전용 공을 조준 오차를 섞어 물리로 굴림 — 결과를 미리 정하지 않음, CPU 차례에는 플레이어 공 잡기를 막음). 게임은 항상 1P 차례로 시작하며, 턴 UI(2026-10-27 추가)는 `GameManager.turnText`(`1pScoreboard/TurnText`, "1P TURN"/"CPU TURN")와 차례인 쪽 스탠드의 `playerTurnIndicator`/`opponentTurnIndicator`(`1P/TurnIndicator`, `2P/TurnIndicator`)로 보여 준다. 표시 이름은 `playerName`/`opponentName`. 각 HMD에는 자기 차례가 시작될 때 `TurnBanner`(루트 `TurnBanner` Canvas, Screen Space - Camera, Main Camera 앞 1m)가 "YOUR TURN"을 약 2.8초 띄운다. `GameManager.TurnStarted(int)` 이벤트를 받으며, 플레이어 번호는 0 = 1P, 1 = 2P/CPU(온라인 자동: 호스트 0, 클라이언트 1 — `NetworkedXRAvatar.Slot`과 같음). VR에서 Screen Space - Overlay는 HMD에 그려지지 않으므로 쓰지 않는다. 온라인 1:1(2026-10-26 1단계): Netcode for GameObjects `2.13.3` + Multiplayer Services `2.4.1`(Sessions + Relay, 익명 로그인). `TutorialScene`의 `Online Lobby` QUICK MATCH → 2명이 모이면 호스트가 `BowlingScene`을 네트워크 로드, `NetworkedXRAvatar`로 머리·손 동기화. 투구·점수·핀은 아직 동기화하지 않는다(진행 상황은 `CHECKLIST.md` 온라인 섹션).
 - 공 회수 방식: 핀 뒤 수거 트리거(`Cube (2)`) 또는 맵 아래 낙하 트리거(루트 `Cube`)에 공이 들어오면(`BallReturnZone`) 공을 지정된 복귀 위치로 옮기고(`BowlingBall.returnPoint`), 공은 거기서 굴러가 `Ball Stand` 아래 큐브의 `XRSocketInteractor`에 안착한다. 안착은 코드로 강제하지 않고 소켓에 맡긴다.
 - 엔진: Unity `6000.6.0f1` (`ProjectSettings/ProjectVersion.txt`)
 - 렌더 파이프라인: URP `17.6.0`
@@ -13,13 +13,13 @@
 - 대상 플랫폼: Android (Min/Target SDK 34), 스크립팅 백엔드 IL2CPP
 - 빌드 씬: `Assets/Scenes/BowlingScene.unity`(활성). `SampleScene.unity`는 빌드 목록에서 비활성.
 - 씬 흐름(계획, 2026-10-21): `TutorialScene`(연습) → "MAIN GAME / START" 버튼(`SceneStartButton`) → `BowlingScene`(메인 게임). 빌드 순서는 메뉴 `Tools > Bowling > Set Build Order (Tutorial → Bowling)`로 맞춘다(실행 전까지 TutorialScene은 빌드 목록에 없음).
-- 튜토리얼 진행(2026-10-26 추가): `TutorialManager`가 `GameManager`와 같은 투구 흐름(투구 → 회수 → 핀 정지 → 집계)으로 단계 안내(공 잡기 → 던지기 → 결과)와 연습 기록을 보여 주고, `throwsToComplete`회 던지면 메인 게임 버튼을 켠다. 점수는 기록하지 않는다. `BowlingBall`은 `GameManager`가 있으면 그쪽에만 알리므로 튜토리얼 씬에는 `GameManager`를 두지 않는다.
+- 튜토리얼 진행(2026-10-26 추가): `TutorialManager`가 `GameManager`와 같은 투구 흐름(투구 → 회수 → 핀 정지 → 집계)으로 단계 안내(공 잡기 → 던지기 → 결과)와 연습 기록을 보여 주고, `throwsToComplete`회 던지면 메인 게임 버튼을 켠다. 점수는 기록하지 않는다. `BowlingBall`은 `GameManager`가 있으면 그쪽에만 알리므로 튜토리얼 씬에는 `GameManager`를 두지 않는다. `TutorialScene` 구성(2026-10-27): `GameManager` 오브젝트에 `TutorialManager` + `PauseMenu` + `BowlingEffects`, 안내판 `Tutorial Guide`(레인 위 x -12, 월드 공간; `InstructionText`, `ResultText`), 연습 기록은 `Canvas/Text (TMP)`, 완료 시 `Main Game Start/Start Button`을 켠다.
 - 패키지 버전의 기준은 `Packages/manifest.json`이며, 위 버전은 이 파일에서 확인했다.
 
 ## 주요 디렉터리
 | 경로 | 역할 | 편집 |
 |---|---|---|
-| `Assets/Scripts/` | 프로젝트 자체 게임 코드 (`GameManager`, `BowlingScoreCard`, `PinSetter`, `BowlingPin`, `SoundManager`, `PauseMenu`, `NeonFlicker`, `BowlingBall`, `BallReturnZone`, `CpuBowler`, `SceneStartButton`, `BowlingEffects`, `TutorialManager`, `OnlineSessionManager`, `NetworkedXRAvatar`, `OnlineSpawnPoints`, `OnlineLobbyPanel`; `Editor/BowlingSceneWiring`, `Editor/MainGameStartButtonMenu`, `Editor/OnlineMultiplayerMenu`) | 주 작업 대상 |
+| `Assets/Scripts/` | 프로젝트 자체 게임 코드 (`GameManager`, `BowlingScoreCard`, `PinSetter`, `BowlingPin`, `SoundManager`, `PauseMenu`, `NeonFlicker`, `BowlingBall`, `BallReturnZone`, `CpuBowler`, `SceneStartButton`, `BowlingEffects`, `TutorialManager`, `TurnBanner`, `OnlineSessionManager`, `NetworkedXRAvatar`, `OnlineSpawnPoints`, `OnlineLobbyPanel`; `Editor/BowlingSceneWiring`, `Editor/MainGameStartButtonMenu`, `Editor/OnlineMultiplayerMenu`) | 주 작업 대상 |
 | `Assets/Scenes/` | 게임 씬 (`BowlingScene` 메인) | Unity Editor에서 편집 |
 | `Assets/Settings/`, `Assets/XR/`, `ProjectSettings/` | URP·XR·프로젝트 설정 | Editor를 통해 변경, 직접 텍스트 편집 지양 |
 | `Assets/Bowling Club/`, `Assets/Sketchfab For Unity/`, `Assets/The combat collection STARTER/`, `Assets/Suggo Creations/` (RETROWAVE SKIES Lite), `Assets/JMO Assets/` (Cartoon FX Remaster Free, 2026-10-23 임포트, `BowlingEffects` 이펙트 프리팹 출처) | 외부 에셋 | 외부 관리 — 직접 수정 금지 |
@@ -80,6 +80,7 @@
 
 ## 확인이 필요한 사항
 - `Floor` 태그가 프리팹·`BowlingPin.cs`에서 쓰이지만 `ProjectSettings/TagManager.asset`에 정의되어 있지 않다(2026-10-14 확인). 점수 판정에 영향이 있을 수 있다.
+- TMP 기본 폰트 머티리얼 `LiberationSans SDF Material`의 `_FaceColor`가 검정이다(2026-10-27 확인). 이 폰트를 쓰는 텍스트는 색을 흰색으로 줘도 검게 보인다. `BowlingScene` 점수판 텍스트는 그래서 `NeonSans SDF`로 바꿨다. 공용 TMP 리소스이므로 머티리얼을 고칠지는 사용자 결정 사항.
 - `applicationIdentifier`가 템플릿 기본값(`com.DefaultCompany.VRTemplate`), `companyName`이 `DefaultCompany`이다. 배포 전 변경 여부는 사용자 결정 사항이다.
 - `ForBuild_BackUpThisFolder_ButDontShipItWithYourGame/`가 Git에 추적되고 있다. 의도된 것인지 확인 전까지는 그대로 둔다.
 - 주 대상 기기(Meta Quest / Android XR)는 설정상 둘 다 가능하며 확정되지 않았다.

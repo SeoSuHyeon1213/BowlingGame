@@ -135,6 +135,17 @@ public static class BowlingSceneWiring
             }
         }
 
+        // 2P(CPU) 레인: CPU 공에 가장 가까운 핀 묶음이 1P 레인과 다를 때만 지정한다(같으면 레인을 함께 쓴다).
+        if (gm.cpuBowler != null && gm.cpuBowler.ball != null && IsEmpty(gm, "opponentPinSetter"))
+        {
+            PinSetter cpuPins = FindLanePinSetter(gm.cpuBowler.ball, pinSetters, laneDir);
+            if (cpuPins != null && cpuPins != gm.pinSetter)
+            {
+                SetRef(gm, "opponentPinSetter", cpuPins);
+                log.AppendLine($"+ GameManager.opponentPinSetter = '{PathOf(cpuPins.transform)}' (same lane as '{gm.cpuBowler.ball.name}')");
+            }
+        }
+
         if (IsEmpty(gm, "scoreText"))
         {
             TextMeshProUGUI p1 = FindInScene<TextMeshProUGUI>(scene).FirstOrDefault(t => t.name == "P1");

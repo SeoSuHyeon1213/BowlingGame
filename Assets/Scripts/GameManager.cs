@@ -13,13 +13,16 @@ public class GameManager : MonoBehaviour
     public static GameManager Instance;
 
     [Header("Lane")]
+    [Tooltip("1P 레인의 핀.")]
     public PinSetter pinSetter;
     [Tooltip("이 레인의 공. 지정하면 다른 레인의 공 투구는 무시한다. 비우면 모든 공을 받는다.")]
     public BowlingBall ball;
 
     [Header("Opponent (선택 사항)")]
-    [Tooltip("지정하면 플레이어와 CPU가 같은 레인에서 프레임마다 번갈아 던진다. 비우면 솔로 게임.")]
+    [Tooltip("지정하면 플레이어와 CPU가 프레임마다 번갈아 던진다. 비우면 솔로 게임.")]
     public CpuBowler cpuBowler;
+    [Tooltip("2P(CPU) 레인의 핀. 비우면 1P와 같은 레인(pinSetter)을 함께 쓴다.")]
+    public PinSetter opponentPinSetter;
 
     [Header("UI (선택 사항)")]
     public TextMeshProUGUI scoreText;
@@ -32,6 +35,18 @@ public class GameManager : MonoBehaviour
     [Tooltip("게임 종료 때 켜는 결과 패널.")]
     public GameObject resultPanel;
     public TextMeshProUGUI resultText;
+
+    [Header("Turn UI (선택 사항)")]
+    [Tooltip("점수, 상태, 턴 표시에 쓰는 플레이어 이름.")]
+    public string playerName = "1P";
+    [Tooltip("상대 이름(CPU 대전이면 \"CPU\", 2인이면 \"2P\").")]
+    public string opponentName = "CPU";
+    [Tooltip("\"1P TURN\"처럼 지금 누구 차례인지 보여 주는 텍스트.")]
+    public TextMeshProUGUI turnText;
+    [Tooltip("플레이어 차례에만 켜는 오브젝트(예: 1P 스탠드 위의 턴 표시).")]
+    public GameObject playerTurnIndicator;
+    [Tooltip("상대 차례에만 켜는 오브젝트(예: 2P 스탠드 위의 턴 표시).")]
+    public GameObject opponentTurnIndicator;
 
     [Header("Timing")]
     [Tooltip("공이 수거된 뒤 핀 판정 전 최소 대기 시간(초).")]
@@ -47,6 +62,12 @@ public class GameManager : MonoBehaviour
 
     public bool IsCpuTurn => cpuTurn;
 
+    // 지금 차례인 플레이어 번호. 0 = 1P, 1 = 2P(또는 CPU). 온라인 아바타의 Slot과 같은 번호를 쓴다.
+    public int CurrentTurnIndex => cpuTurn ? 1 : 0;
+
+    // 새 게임 시작과 차례가 넘어갈 때 차례를 받은 플레이어 번호로 알린다(TurnBanner 등).
+    public event System.Action<int> TurnStarted;
+
     private readonly BowlingScoreCard scoreCard = new BowlingScoreCard();
     private readonly BowlingScoreCard cpuCard = new BowlingScoreCard();
     private bool cpuTurn;
@@ -56,6 +77,14 @@ public class GameManager : MonoBehaviour
 
     private bool HasCpu => cpuBowler != null;
     private BowlingScoreCard ActiveCard => cpuTurn ? cpuCard : scoreCard;
+
+    // 플레이어 번호(0 = 1P, 1 = 2P/CPU)의 레인 핀. 2P 레인이 없으면 1P 레인을 함께 쓴다.
+    public PinSetter GetPinSetter(int playerIndex)
+    {
+        return playerIndex == 1 && opponentPinSetter != null ? opponentPinSetter : pinSetter;
+    }
+
+    private PinSetter ActivePinSetter => GetPinSetter(CurrentTurnIndex);
 
     void Awake()
     {
@@ -92,10 +121,12 @@ public class GameManager : MonoBehaviour
         cpuCard.Reset();
         cpuTurn = false;
         if (pinSetter != null) pinSetter.ResetAllPins();
+        if (opponentPinSetter != null) opponentPinSetter.ResetAllPins();
         if (resultPanel != null) resultPanel.SetActive(false);
         currentBall = null;
         State = GameState.Ready;
         UpdateUI();
+        TurnStarted?.Invoke(CurrentTurnIndex);
     }
 
     // 플레이어가 공을 손으로 잡을 수 있는지(BowlingBall의 선택 필터에서 사용). CPU 차례에는 잡지 못한다.
@@ -113,7 +144,8 @@ public class GameManager : MonoBehaviour
         if (expected != null && thrownBall != expected) return false;
         if (!cpuTurn && HasCpu && thrownBall == cpuBowler.ball) return false;
 
-        if (pinSetter == null)
+        PinSetter lane = ActivePinSetter;
+        if (lane == null)
         {
             Debug.LogWarning("GameManager: pinSetter가 지정되지 않아 투구를 집계할 수 없습니다.", this);
             return false;
@@ -121,7 +153,7 @@ public class GameManager : MonoBehaviour
 
         currentBall = thrownBall;
         rollStartTime = Time.time;
-        standingBeforeRoll = pinSetter.CountStanding();
+        standingBeforeRoll = lane.CountStanding();
         State = GameState.Rolling;
         SetStatus(GetTurnStatus());
         return true;
@@ -148,22 +180,25 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator ResolveRollRoutine()
     {
+        // 차례는 이 투구가 끝날 때까지 바뀌지 않으므로 지금 차례의 레인과 점수표를 쓴다.
+        PinSetter lane = ActivePinSetter;
+        BowlingScoreCard card = ActiveCard;
+
         float start = Time.time;
         yield return new WaitForSeconds(minSettleTime);
 
-        while (Time.time - start < maxSettleTime && pinSetter.AnyPinMoving(pinRestSpeed))
+        while (Time.time - start < maxSettleTime && lane.AnyPinMoving(pinRestSpeed))
         {
             yield return null;
         }
 
-        BowlingScoreCard card = ActiveCard;
-        int knocked = standingBeforeRoll - pinSetter.CountStanding();
+        int knocked = standingBeforeRoll - lane.CountStanding();
         int frameBefore = card.CurrentFrame;
         int rollBefore = card.CurrentRollInFrame;
         card.AddRoll(knocked);
 
         string message = GetRollMessage(knocked, frameBefore, rollBefore);
-        PlayRollEffect(message);
+        PlayRollEffect(message, lane);
 
         if (scoreCard.IsGameOver && (!HasCpu || cpuCard.IsGameOver))
         {
@@ -179,20 +214,22 @@ public class GameManager : MonoBehaviour
         bool turnChanged = HasCpu && frameDone;
         if (turnChanged) cpuTurn = !cpuTurn;
 
-        // 다음 투구가 새 랙이면 10개를 다시 세우고, 아니면 쓰러진 핀만 치운다.
-        if (turnChanged || ActiveCard.PinsStanding == BowlingScoreCard.PinCount)
+        // 방금 던진 레인: 프레임이 끝났거나 다음 투구가 새 랙이면 10개를 다시 세우고, 아니면 쓰러진 핀만 치운다.
+        // (레인을 함께 쓰는 경우에도 차례가 넘어가면 frameDone이므로 상대는 새 랙에서 시작한다.)
+        if (frameDone || card.PinsStanding == BowlingScoreCard.PinCount)
         {
-            pinSetter.ResetAllPins();
+            lane.ResetAllPins();
         }
         else
         {
-            pinSetter.ClearFallenPins();
+            lane.ClearFallenPins();
         }
 
         currentBall = null;
         State = GameState.Ready;
         UpdateUI();
         if (!string.IsNullOrEmpty(message)) SetStatus(message);
+        if (turnChanged) TurnStarted?.Invoke(CurrentTurnIndex);
 
         if (cpuTurn) cpuBowler.TakeTurn();
     }
@@ -206,11 +243,11 @@ public class GameManager : MonoBehaviour
         return $"{knocked} pin{(knocked == 1 ? "" : "s")}";
     }
 
-    private void PlayRollEffect(string message)
+    private void PlayRollEffect(string message, PinSetter lane)
     {
         if (BowlingEffects.Instance == null) return;
-        if (message == "STRIKE!") BowlingEffects.Instance.PlayStrike(pinSetter.GetRackCenter());
-        else if (message == "SPARE!") BowlingEffects.Instance.PlaySpare(pinSetter.GetRackCenter());
+        if (message == "STRIKE!") BowlingEffects.Instance.PlayStrike(lane.GetRackCenter());
+        else if (message == "SPARE!") BowlingEffects.Instance.PlaySpare(lane.GetRackCenter());
     }
 
     private void ShowResult()
@@ -221,8 +258,8 @@ public class GameManager : MonoBehaviour
             if (HasCpu)
             {
                 int cpuTotal = cpuCard.GetTotalScore();
-                string winner = total > cpuTotal ? "You Win!" : total < cpuTotal ? "CPU Wins" : "Draw";
-                resultText.text = $"Game Over\nYou : {total}\nCPU : {cpuTotal}\n{winner}";
+                string winner = total > cpuTotal ? $"{playerName} Wins!" : total < cpuTotal ? $"{opponentName} Wins" : "Draw";
+                resultText.text = $"Game Over\n{playerName} : {total}\n{opponentName} : {cpuTotal}\n{winner}";
             }
             else
             {
@@ -242,17 +279,17 @@ public class GameManager : MonoBehaviour
             }
             else if (cpuScoreText != null)
             {
-                scoreText.text = "You : " + scoreCard.GetTotalScore().ToString();
+                scoreText.text = playerName + " : " + scoreCard.GetTotalScore().ToString();
             }
             else
             {
-                scoreText.text = $"You : {scoreCard.GetTotalScore()}   CPU : {cpuCard.GetTotalScore()}";
+                scoreText.text = $"{playerName} : {scoreCard.GetTotalScore()}   {opponentName} : {cpuCard.GetTotalScore()}";
             }
         }
 
         if (cpuScoreText != null)
         {
-            cpuScoreText.text = HasCpu ? "CPU : " + cpuCard.GetTotalScore().ToString() : "";
+            cpuScoreText.text = HasCpu ? opponentName + " : " + cpuCard.GetTotalScore().ToString() : "";
         }
 
         if (scoreBoardText != null)
@@ -264,12 +301,25 @@ public class GameManager : MonoBehaviour
         {
             SetStatus(GetTurnStatus());
         }
+
+        UpdateTurnUI();
+    }
+
+    // 지금 차례인 쪽의 턴 표시만 켠다. 게임이 끝나면 모두 끈다.
+    private void UpdateTurnUI()
+    {
+        bool playing = State != GameState.GameOver;
+        string current = cpuTurn ? opponentName : playerName;
+
+        if (turnText != null) turnText.text = playing ? current + " TURN" : "";
+        if (playerTurnIndicator != null) playerTurnIndicator.SetActive(playing && !cpuTurn);
+        if (opponentTurnIndicator != null) opponentTurnIndicator.SetActive(playing && cpuTurn);
     }
 
     private string GetTurnStatus()
     {
         BowlingScoreCard card = ActiveCard;
-        string prefix = !HasCpu ? "" : cpuTurn ? "CPU - " : "You - ";
+        string prefix = !HasCpu ? "" : (cpuTurn ? opponentName : playerName) + " - ";
         return $"{prefix}Frame {card.CurrentFrame} - Ball {card.CurrentRollInFrame}";
     }
 
@@ -278,7 +328,7 @@ public class GameManager : MonoBehaviour
         if (statusText != null) statusText.text = message;
     }
 
-    // 솔로: 프레임 번호 / 표기 / 누적 점수. 대전: 프레임 번호 아래에 YOU, CPU 두 줄씩.
+    // 솔로: 프레임 번호 / 표기 / 누적 점수. 대전: 프레임 번호 아래에 플레이어, 상대 두 줄씩.
     private string BuildScoreBoard()
     {
         if (!HasCpu)
@@ -286,7 +336,10 @@ public class GameManager : MonoBehaviour
             return "<mspace=0.6em>" + BuildHeader("") + "\n" + BuildRows(scoreCard, "") + "</mspace>";
         }
 
-        return "<mspace=0.6em>" + BuildHeader("    ") + "\n" + BuildRows(scoreCard, "YOU ") + "\n" + BuildRows(cpuCard, "CPU ") + "</mspace>";
+        int labelWidth = Mathf.Max(playerName.Length, opponentName.Length) + 1;
+        return "<mspace=0.6em>" + BuildHeader(new string(' ', labelWidth)) + "\n"
+            + BuildRows(scoreCard, playerName.PadRight(labelWidth)) + "\n"
+            + BuildRows(cpuCard, opponentName.PadRight(labelWidth)) + "</mspace>";
     }
 
     private static string BuildHeader(string prefix)
