@@ -10,7 +10,7 @@ public class CpuBowler : MonoBehaviour
     public BowlingBall ball;
     [Tooltip("공을 놓을 위치. 파울 라인 앞 레인 중앙에 두고, 파란 축(forward)이 핀 쪽을 향하게 한다.")]
     public Transform throwPoint;
-    [Tooltip("비우면 GameManager.pinSetter를 쓴다.")]
+    [Tooltip("CPU 레인의 핀. GameManager도 CPU 투구를 이 핀으로 집계한다. 비우면 GameManager.pinSetter(플레이어 레인)를 같이 쓴다.")]
     public PinSetter pinSetter;
 
     [Header("Aim")]

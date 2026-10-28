@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 
 // 1게임(10프레임) 진행. cpuBowler를 지정하면 플레이어와 CPU가 프레임마다 번갈아 던지고, 비우면 솔로.
+// CpuBowler.pinSetter를 지정하면 CPU는 자기 레인의 핀으로 집계하고, 비우면 플레이어와 같은 레인을 쓴다.
 // 투구(BowlingBall.OnBallThrown / CpuBowler) → 공 회수(OnBallCollected) → 핀이 멈출 때까지 대기
 // → 쓰러진 핀 집계 → 점수 기록 → 핀 정리/재세팅 → 다음 투구, 10프레임이 끝나면 결과 표시.
 public class GameManager : MonoBehaviour
@@ -18,7 +19,7 @@ public class GameManager : MonoBehaviour
     public BowlingBall ball;
 
     [Header("Opponent (선택 사항)")]
-    [Tooltip("지정하면 플레이어와 CPU가 같은 레인에서 프레임마다 번갈아 던진다. 비우면 솔로 게임.")]
+    [Tooltip("지정하면 플레이어와 CPU가 프레임마다 번갈아 던진다. 비우면 솔로 게임.")]
     public CpuBowler cpuBowler;
 
     [Header("UI (선택 사항)")]
@@ -56,6 +57,9 @@ public class GameManager : MonoBehaviour
 
     private bool HasCpu => cpuBowler != null;
     private BowlingScoreCard ActiveCard => cpuTurn ? cpuCard : scoreCard;
+    private PinSetter CpuPins => HasCpu && cpuBowler.pinSetter != null ? cpuBowler.pinSetter : pinSetter;
+    // 지금 던지는 쪽의 레인 핀.
+    private PinSetter ActivePins => cpuTurn ? CpuPins : pinSetter;
 
     void Awake()
     {
@@ -92,10 +96,16 @@ public class GameManager : MonoBehaviour
         cpuCard.Reset();
         cpuTurn = false;
         if (pinSetter != null) pinSetter.ResetAllPins();
+        if (CpuPins != null && CpuPins != pinSetter) CpuPins.ResetAllPins();
         if (resultPanel != null) resultPanel.SetActive(false);
         currentBall = null;
         State = GameState.Ready;
         UpdateUI();
+        if (HasCpu && RollResultPopup.Instance != null)
+        {
+            RollResultPopup.Instance.Clear();
+            RollResultPopup.Instance.ShowTurn(false);
+        }
     }
 
     // 플레이어가 공을 손으로 잡을 수 있는지(BowlingBall의 선택 필터에서 사용). CPU 차례에는 잡지 못한다.
@@ -113,7 +123,7 @@ public class GameManager : MonoBehaviour
         if (expected != null && thrownBall != expected) return false;
         if (!cpuTurn && HasCpu && thrownBall == cpuBowler.ball) return false;
 
-        if (pinSetter == null)
+        if (ActivePins == null)
         {
             Debug.LogWarning("GameManager: pinSetter가 지정되지 않아 투구를 집계할 수 없습니다.", this);
             return false;
@@ -121,7 +131,7 @@ public class GameManager : MonoBehaviour
 
         currentBall = thrownBall;
         rollStartTime = Time.time;
-        standingBeforeRoll = pinSetter.CountStanding();
+        standingBeforeRoll = ActivePins.CountStanding();
         State = GameState.Rolling;
         SetStatus(GetTurnStatus());
         return true;
@@ -151,19 +161,20 @@ public class GameManager : MonoBehaviour
         float start = Time.time;
         yield return new WaitForSeconds(minSettleTime);
 
-        while (Time.time - start < maxSettleTime && pinSetter.AnyPinMoving(pinRestSpeed))
+        PinSetter lane = ActivePins;
+        while (Time.time - start < maxSettleTime && lane.AnyPinMoving(pinRestSpeed))
         {
             yield return null;
         }
 
         BowlingScoreCard card = ActiveCard;
-        int knocked = standingBeforeRoll - pinSetter.CountStanding();
+        int knocked = standingBeforeRoll - lane.CountStanding();
         int frameBefore = card.CurrentFrame;
         int rollBefore = card.CurrentRollInFrame;
         card.AddRoll(knocked);
 
         string message = GetRollMessage(knocked, frameBefore, rollBefore);
-        PlayRollEffect(message);
+        PlayRollEffect(message, lane);
 
         if (scoreCard.IsGameOver && (!HasCpu || cpuCard.IsGameOver))
         {
@@ -177,16 +188,23 @@ public class GameManager : MonoBehaviour
         // 대전이면 프레임이 끝날 때마다 차례를 넘긴다. 플레이어 10프레임 뒤에는 CPU 10프레임이 이어진다.
         bool frameDone = card.IsGameOver || card.CurrentFrame != frameBefore;
         bool turnChanged = HasCpu && frameDone;
-        if (turnChanged) cpuTurn = !cpuTurn;
 
-        // 다음 투구가 새 랙이면 10개를 다시 세우고, 아니면 쓰러진 핀만 치운다.
-        if (turnChanged || ActiveCard.PinsStanding == BowlingScoreCard.PinCount)
+        // 이 레인의 다음 투구가 새 랙(프레임 종료·스트라이크)이면 10개를 다시 세우고, 아니면 쓰러진 핀만 치운다.
+        // 차례가 바뀌는 것도 프레임이 끝났을 때라 레인을 같이 쓸 때도 새 랙으로 넘겨진다.
+        if (frameDone || card.PinsStanding == BowlingScoreCard.PinCount)
         {
-            pinSetter.ResetAllPins();
+            lane.ResetAllPins();
         }
         else
         {
-            pinSetter.ClearFallenPins();
+            lane.ClearFallenPins();
+        }
+
+        if (turnChanged)
+        {
+            cpuTurn = !cpuTurn;
+            // 차례가 바뀌면 1P/2P 이미지를 띄운다(결과 이미지가 있으면 그 뒤에 이어서).
+            if (RollResultPopup.Instance != null) RollResultPopup.Instance.ShowTurn(cpuTurn);
         }
 
         currentBall = null;
@@ -206,11 +224,17 @@ public class GameManager : MonoBehaviour
         return $"{knocked} pin{(knocked == 1 ? "" : "s")}";
     }
 
-    private void PlayRollEffect(string message)
+    private void PlayRollEffect(string message, PinSetter lane)
     {
+        if (RollResultPopup.Instance != null)
+        {
+            if (message == "STRIKE!") RollResultPopup.Instance.ShowStrike();
+            else if (message == "SPARE!") RollResultPopup.Instance.ShowSpare();
+        }
+
         if (BowlingEffects.Instance == null) return;
-        if (message == "STRIKE!") BowlingEffects.Instance.PlayStrike(pinSetter.GetRackCenter());
-        else if (message == "SPARE!") BowlingEffects.Instance.PlaySpare(pinSetter.GetRackCenter());
+        if (message == "STRIKE!") BowlingEffects.Instance.PlayStrike(lane.GetRackCenter());
+        else if (message == "SPARE!") BowlingEffects.Instance.PlaySpare(lane.GetRackCenter());
     }
 
     private void ShowResult()
@@ -269,7 +293,9 @@ public class GameManager : MonoBehaviour
     private string GetTurnStatus()
     {
         BowlingScoreCard card = ActiveCard;
-        string prefix = !HasCpu ? "" : cpuTurn ? "CPU - " : "You - ";
+        // 차례 이미지(1P/2P)를 띄울 수 있으면 문구에서 차례 표시를 뺀다.
+        bool turnImage = RollResultPopup.Instance != null && RollResultPopup.Instance.CanShowTurn;
+        string prefix = !HasCpu || turnImage ? "" : cpuTurn ? "CPU - " : "You - ";
         return $"{prefix}Frame {card.CurrentFrame} - Ball {card.CurrentRollInFrame}";
     }
 

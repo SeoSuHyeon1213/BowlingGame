@@ -8,14 +8,18 @@ using UnityEngine.XR.Interaction.Toolkit.Interactors;
 // 볼링공 복귀 처리.
 // 수거 구역(BallReturnZone)에 들어오면 returnPoint로 옮긴 뒤 물리로 굴러가게 두고,
 // 볼 스탠드의 XRSocketInteractor(큐브 소켓)가 공을 받아 안착시킨다.
+// rack을 지정하면 빈 소켓을 골라 그쪽으로 힘을 주어 보내고, 그 소켓만 공을 받게 한다.
 [RequireComponent(typeof(Rigidbody))]
 public class BowlingBall : MonoBehaviour
 {
     [Tooltip("공이 다시 나오는 위치. 여기서 굴러가 소켓에 안착하도록 배치한다.")]
     public Transform returnPoint;
 
-    [Tooltip("복귀 위치에 놓을 때 줄 초기 속도(월드 좌표, m/s). 0이면 중력만으로 굴러간다.")]
+    [Tooltip("복귀 위치에 놓을 때 줄 초기 속도(월드 좌표, m/s). 0이면 중력만으로 굴러간다. rack이 있으면 rack이 정한 속도를 쓴다.")]
     public Vector3 returnVelocity = Vector3.zero;
+
+    [Tooltip("공을 받을 볼 스탠드. 지정하면 빈 소켓 쪽으로 공을 보낸다.")]
+    public BallReturnRack rack;
 
     [Tooltip("수거 구역에 들어간 뒤 복귀까지 기다리는 시간(초).")]
     public float returnDelay = 0f;
@@ -27,6 +31,8 @@ public class BowlingBall : MonoBehaviour
     private XRBaseInteractable interactable;
     private bool isReturning = false;
     private XRSelectFilterDelegate grabFilter;
+    private XRSocketInteractor targetSocket;
+    private Coroutine targetRoutine;
 
     void Awake()
     {
@@ -55,15 +61,18 @@ public class BowlingBall : MonoBehaviour
         }
     }
 
-    // CPU 차례에는 손으로 잡지 못하게 한다(잡고 있던 공도 놓친다). 소켓 안착은 언제나 허용한다.
+    // CPU 차례에는 손으로 잡지 못하게 한다(잡고 있던 공도 놓친다).
+    // 소켓 안착은 허용하되, 복귀 중 목표 소켓이 있으면 그 소켓만 받는다(지나가는 소켓에 붙잡히지 않게).
     private bool CanBeSelected(IXRSelectInteractor interactor, IXRSelectInteractable target)
     {
-        if (interactor is XRSocketInteractor) return true;
+        if (interactor is XRSocketInteractor socket) return targetSocket == null || socket == targetSocket;
         return GameManager.Instance == null || GameManager.Instance.CanPlayerGrab();
     }
 
     private void OnSelectEntered(SelectEnterEventArgs args)
     {
+        ClearTarget();
+
         // 소켓 안착은 투구와 무관하다. 손으로 다시 잡으면 진행 중인 투구를 취소한다.
         if (args.interactorObject is XRSocketInteractor) return;
 
@@ -175,11 +184,52 @@ public class BowlingBall : MonoBehaviour
 
         if (!rb.isKinematic)
         {
-            rb.linearVelocity = returnVelocity;
+            rb.linearVelocity = GetReturnVelocity();
         }
 
         // 위치 이동이 물리에 반영될 때까지 중복 복귀를 막는다.
         yield return new WaitForFixedUpdate();
         isReturning = false;
+    }
+
+    private Vector3 GetReturnVelocity()
+    {
+        ClearTarget();
+        if (rack == null) return returnVelocity;
+
+        targetSocket = rack.PickSocket(this);
+        if (targetSocket == null) return returnVelocity;
+
+        targetRoutine = StartCoroutine(TargetTimeoutRoutine());
+        return rack.GetLaunchVelocity(returnPoint.position, targetSocket, GetRadius());
+    }
+
+    // 목표 소켓에 제때 들어가지 못하면(막히거나 튕겨 나가는 등) 어느 소켓이든 받을 수 있게 푼다.
+    private IEnumerator TargetTimeoutRoutine()
+    {
+        yield return new WaitForSeconds(rack.targetTimeout);
+        targetRoutine = null;
+        ClearTarget();
+    }
+
+    private void ClearTarget()
+    {
+        if (targetRoutine != null)
+        {
+            StopCoroutine(targetRoutine);
+            targetRoutine = null;
+        }
+
+        targetSocket = null;
+        if (rack != null) rack.Release(this);
+    }
+
+    private float GetRadius()
+    {
+        SphereCollider sphere = GetComponent<SphereCollider>();
+        if (sphere == null) return 0.11f;
+
+        Vector3 scale = transform.lossyScale;
+        return sphere.radius * Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
     }
 }
