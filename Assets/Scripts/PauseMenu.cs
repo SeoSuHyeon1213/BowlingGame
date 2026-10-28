@@ -19,6 +19,8 @@ public class PauseMenu : MonoBehaviour
     public float panelDistance = 1.5f;
     [Tooltip("눈높이 기준 창의 높이 보정(m).")]
     public float panelHeightOffset = -0.1f;
+    [Tooltip("창이 World Space가 아니거나 배율이 1이면(화면용 크기) 시작할 때 World Space로 바꾸고 이 배율을 쓴다. VR에서는 Screen Space 창이 보이지 않는다.")]
+    public float worldSpaceScale = 0.001f;
 
     [Header("Input")]
     [Tooltip("일시 정지 열기/닫기 액션. 기본값은 왼손 컨트롤러 메뉴 버튼. 다른 액션 에셋을 쓰려면 Use Reference로 바꿔 연결한다.")]
@@ -45,6 +47,9 @@ public class PauseMenu : MonoBehaviour
 
     public Slider volumeSlider;
 
+    [Tooltip("배경음악 토글. 체크(isOn) = 배경음악 켜짐. 전체 음소거(muteToggle)와 별개다.")]
+    public Toggle bgmToggle;
+
     [Header("Quit")]
     [Tooltip("나가기 때 불러올 씬 이름(예: 로비). 비우면 앱을 종료한다.")]
     public string quitSceneName = "";
@@ -63,9 +68,31 @@ public class PauseMenu : MonoBehaviour
         if (muteButton != null) muteButton.onClick.AddListener(OnMuteButton);
         if (muteToggle != null) muteToggle.onValueChanged.AddListener(OnMuteToggle);
         if (volumeSlider != null) volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
+        if (bgmToggle != null) bgmToggle.onValueChanged.AddListener(OnBgmToggle);
 
+        EnsureWorldSpace();
         RefreshSoundUI();
         SetPanelVisible(false);
+    }
+
+    // 에디터에서 Render Mode를 바꾸면 크기가 화면 해상도로 바뀌어 VR에서 안 보이거나 거대해진다. 실행 때 바로잡는다.
+    private void EnsureWorldSpace()
+    {
+        if (pausePanel == null) return;
+        Canvas canvas = pausePanel.GetComponent<Canvas>();
+        if (canvas == null) return;
+
+        bool screenSpace = canvas.renderMode != RenderMode.WorldSpace;
+        bool unscaled = pausePanel.transform.localScale.x > 0.01f;
+        if (!screenSpace && !unscaled) return;
+
+        RectTransform rect = (RectTransform)pausePanel.transform;
+        Vector2 size = rect.sizeDelta;
+        canvas.renderMode = RenderMode.WorldSpace;
+        canvas.worldCamera = Camera.main;
+        rect.sizeDelta = size;
+        rect.localScale = Vector3.one * worldSpaceScale;
+        Debug.LogWarning($"PauseMenu: 일시 정지 창을 World Space(배율 {worldSpaceScale})로 바꿨습니다. 씬에서도 고쳐 두세요.", this);
     }
 
     void OnEnable()
@@ -173,6 +200,13 @@ public class PauseMenu : MonoBehaviour
         RefreshSoundUI();
     }
 
+    private void OnBgmToggle(bool on)
+    {
+        if (SoundManager.instance == null) return;
+        SoundManager.instance.SetBgmEnabled(on);
+        RefreshSoundUI();
+    }
+
     private void OnVolumeChanged(float value)
     {
         if (SoundManager.instance == null) return;
@@ -195,6 +229,7 @@ public class PauseMenu : MonoBehaviour
 
         if (volumeSlider != null) volumeSlider.SetValueWithoutNotify(SoundManager.instance.MasterVolume);
         if (muteToggle != null) muteToggle.SetIsOnWithoutNotify(muted);
+        if (bgmToggle != null) bgmToggle.SetIsOnWithoutNotify(SoundManager.instance.BgmEnabled);
 
         if (muteIcon != null)
         {

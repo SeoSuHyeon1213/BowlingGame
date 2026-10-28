@@ -60,6 +60,8 @@ public class GameManager : MonoBehaviour
     private PinSetter CpuPins => HasCpu && cpuBowler.pinSetter != null ? cpuBowler.pinSetter : pinSetter;
     // 지금 던지는 쪽의 레인 핀.
     private PinSetter ActivePins => cpuTurn ? CpuPins : pinSetter;
+    // 지금 던지는 쪽의 레인(결과 이미지를 그 레인에 띄울 때 GutterZone 등이 쓴다).
+    public PinSetter ActiveLane => ActivePins;
 
     void Awake()
     {
@@ -101,10 +103,11 @@ public class GameManager : MonoBehaviour
         currentBall = null;
         State = GameState.Ready;
         UpdateUI();
-        if (HasCpu && RollResultPopup.Instance != null)
+        RollResultPopup.ClearAll();
+        if (HasCpu)
         {
-            RollResultPopup.Instance.Clear();
-            RollResultPopup.Instance.ShowTurn(false);
+            RollResultPopup popup = RollResultPopup.For(pinSetter);
+            if (popup != null) popup.ShowTurn(false);
         }
     }
 
@@ -203,8 +206,9 @@ public class GameManager : MonoBehaviour
         if (turnChanged)
         {
             cpuTurn = !cpuTurn;
-            // 차례가 바뀌면 1P/2P 이미지를 띄운다(결과 이미지가 있으면 그 뒤에 이어서).
-            if (RollResultPopup.Instance != null) RollResultPopup.Instance.ShowTurn(cpuTurn);
+            // 차례가 바뀌면 다음 사람 레인에 1P/2P 이미지를 띄운다(같은 팝업에 결과 이미지가 있으면 그 뒤에 이어서).
+            RollResultPopup popup = RollResultPopup.For(ActivePins);
+            if (popup != null) popup.ShowTurn(cpuTurn);
         }
 
         currentBall = null;
@@ -226,10 +230,11 @@ public class GameManager : MonoBehaviour
 
     private void PlayRollEffect(string message, PinSetter lane)
     {
-        if (RollResultPopup.Instance != null)
+        RollResultPopup popup = RollResultPopup.For(lane);
+        if (popup != null)
         {
-            if (message == "STRIKE!") RollResultPopup.Instance.ShowStrike();
-            else if (message == "SPARE!") RollResultPopup.Instance.ShowSpare();
+            if (message == "STRIKE!") popup.ShowStrike();
+            else if (message == "SPARE!") popup.ShowSpare();
         }
 
         if (BowlingEffects.Instance == null) return;
@@ -294,7 +299,8 @@ public class GameManager : MonoBehaviour
     {
         BowlingScoreCard card = ActiveCard;
         // 차례 이미지(1P/2P)를 띄울 수 있으면 문구에서 차례 표시를 뺀다.
-        bool turnImage = RollResultPopup.Instance != null && RollResultPopup.Instance.CanShowTurn;
+        RollResultPopup popup = RollResultPopup.For(ActivePins);
+        bool turnImage = popup != null && popup.CanShowTurn;
         string prefix = !HasCpu || turnImage ? "" : cpuTurn ? "CPU - " : "You - ";
         return $"{prefix}Frame {card.CurrentFrame} - Ball {card.CurrentRollInFrame}";
     }

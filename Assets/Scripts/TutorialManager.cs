@@ -195,10 +195,11 @@ public class TutorialManager : MonoBehaviour
 
     private void PlayRollEffect(string message)
     {
-        if (RollResultPopup.Instance != null)
+        RollResultPopup popup = RollResultPopup.For(pinSetter);
+        if (popup != null)
         {
-            if (message == "STRIKE!") RollResultPopup.Instance.ShowStrike();
-            else if (message == "SPARE!") RollResultPopup.Instance.ShowSpare();
+            if (message == "STRIKE!") popup.ShowStrike();
+            else if (message == "SPARE!") popup.ShowSpare();
         }
 
         if (BowlingEffects.Instance == null) return;

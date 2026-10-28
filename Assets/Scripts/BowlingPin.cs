@@ -2,6 +2,7 @@ using UnityEngine;
 
 public class BowlingPin : MonoBehaviour
 {
+    [Tooltip("넘어지는 소리를 이미 냈는지. 다시 세우면(ResetPin) 초기화된다.")]
     public bool isFallen = false;
 
     [Tooltip("처음 세워진 방향에서 이 각도(도) 이상 기울면 쓰러진 것으로 본다.")]
@@ -26,23 +27,19 @@ public class BowlingPin : MonoBehaviour
         localUpAtStart = Quaternion.Inverse(startRotation) * Vector3.up;
     }
 
-    private void OnTriggerEnter(Collider other)
+    // 쓰러지는 순간(기울기/낙하 판정이 처음 참이 될 때) 한 번 소리를 낸다.
+    void Update()
     {
-        if (other.gameObject.CompareTag("Floor"))
-        {
-            if (!isFallen && SoundManager.instance != null)
-            {
-                SoundManager.instance.PlaySFX(SoundManager.instance.hitClip);
-            }
-            isFallen = true;
-        }
+        if (isFallen || !IsKnockedDown()) return;
+
+        isFallen = true;
+        if (SoundManager.instance != null) SoundManager.instance.PlayPinFall();
     }
 
     // 점수 계산용 판정. 점수 자체는 GameManager가 투구가 끝난 뒤 한 번에 집계한다.
     public bool IsKnockedDown()
     {
-        // isFallen(Floor 트리거)은 효과음 용도로만 쓴다. Floor 태그 오브젝트 배치에 따라
-        // 서 있는 핀도 닿을 수 있으므로 판정은 기울기와 낙하로만 한다.
+        // isFallen은 효과음 용도로만 쓴다. 판정은 기울기와 낙하로만 한다.
         if (!gameObject.activeInHierarchy) return true;
 
         Vector3 currentUp = transform.rotation * localUpAtStart;

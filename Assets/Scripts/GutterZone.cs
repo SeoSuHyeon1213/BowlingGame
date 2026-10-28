@@ -80,9 +80,10 @@ public class GutterZone : MonoBehaviour
             SoundManager.instance.PlaySFX(badClip);
         }
 
-        if (RollResultPopup.Instance != null)
-        {
-            RollResultPopup.Instance.ShowBad();
-        }
+        // 지금 던지는 사람의 레인 팝업에 띄운다.
+        PinSetter lane = GameManager.Instance != null ? GameManager.Instance.ActiveLane
+            : TutorialManager.Instance != null ? TutorialManager.Instance.pinSetter : null;
+        RollResultPopup popup = RollResultPopup.For(lane);
+        if (popup != null) popup.ShowBad();
     }
 }

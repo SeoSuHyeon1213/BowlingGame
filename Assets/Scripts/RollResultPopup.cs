@@ -7,9 +7,13 @@ using UnityEngine.UI;
 // 월드 공간 Canvas 아래 Image에 붙이거나, resultImage에 그 Image를 지정한다. 평소에는 숨겨 둔다.
 // GameManager/TutorialManager가 스트라이크·스페어 때, GutterZone이 거터에 빠졌을 때, GameManager가 차례가 바뀔 때 호출한다.
 // 여러 개가 이어서 오면(예: SPARE! 직후 차례 변경) 순서대로 하나씩 보여 준다.
+// 레인마다 하나씩 두고 lane에 그 레인의 PinSetter를 지정하면, 각 투구 결과가 그 레인의 팝업에만 뜬다(For(lane)).
 public class RollResultPopup : MonoBehaviour
 {
-    public static RollResultPopup Instance;
+    private static readonly List<RollResultPopup> all = new List<RollResultPopup>();
+
+    [Tooltip("이 팝업이 맡는 레인의 핀. 비우면 레인이 지정된 팝업이 없는 레인의 결과를 모두 받는다.")]
+    public PinSetter lane;
 
     [Tooltip("결과 이미지를 표시할 Image. 비우면 이 오브젝트의 Image를 쓴다.")]
     public Image resultImage;
@@ -32,17 +36,26 @@ public class RollResultPopup : MonoBehaviour
     private readonly Queue<Sprite> queue = new Queue<Sprite>();
     private Coroutine playRoutine;
 
+    // lane을 맡은 팝업. 없으면 lane이 비어 있는 팝업, 그것도 없으면 아무 팝업(씬에 하나뿐인 경우). 하나도 없으면 null.
+    public static RollResultPopup For(PinSetter lane)
+    {
+        RollResultPopup fallback = null;
+        foreach (RollResultPopup popup in all)
+        {
+            if (lane != null && popup.lane == lane) return popup;
+            if (popup.lane == null || fallback == null) fallback = popup;
+        }
+        return fallback;
+    }
+
+    public static void ClearAll()
+    {
+        foreach (RollResultPopup popup in all) popup.Clear();
+    }
+
     void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(this);
-            return;
-        }
+        all.Add(this);
 
         if (resultImage == null) resultImage = GetComponent<Image>();
         if (resultImage != null)
@@ -54,7 +67,7 @@ public class RollResultPopup : MonoBehaviour
 
     void OnDestroy()
     {
-        if (Instance == this) Instance = null;
+        all.Remove(this);
     }
 
     public void ShowStrike() { Show(strikeSprite); }
