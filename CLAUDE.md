@@ -46,6 +46,7 @@
 ## 코드 규칙 (기존 코드에서 확인)
 - `MonoBehaviour` 기반, 네임스페이스 없음. 인스펙터 연결 필드는 `public` 필드로 선언하는 방식을 따른다.
 - 매니저는 `Awake()`에서 정적 인스턴스를 설정하는 싱글턴 패턴. 단, 필드명이 `GameManager.Instance`(대문자)와 `SoundManager.instance`(소문자)로 일관되지 않는다. 사용자 요청 없이 이름을 통일하지 않는다(씬/다른 코드 참조가 깨질 수 있음).
+- VR에서 보이는 UI는 World Space Canvas여야 한다(Screen Space Overlay는 헤드셋에 안 보임). BowlingScene `Paused`: World Space, 2474×1237 × 0.001, Sorting Order 100(다른 월드 캔버스 위에 그림), `PauseMenu.playerHead`는 비워 Main Camera 사용(2026-10-28, Play 모드에서 눈앞 1.5m 표시·이어하기 확인).
 - 바닥 판정은 `"Floor"` 태그에 의존한다. 태그 이름 변경 시 `TagManager.asset`과 씬 오브젝트를 함께 확인한다.
 - 새 기능은 기존 매니저(`GameManager`, `SoundManager`)를 먼저 재사용할 수 있는지 확인한다.
 

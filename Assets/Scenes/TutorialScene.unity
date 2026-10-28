@@ -2532,6 +2532,8 @@ MonoBehaviour:
   strikeSprite: {fileID: 21300000, guid: c1260400178164dafbec050bc63f95b1, type: 3}
   spareSprite: {fileID: 21300000, guid: e8666327ec53a4ee2a9bcbd1eef295ee, type: 3}
   badSprite: {fileID: 21300000, guid: 20325ab4edabc4af49ca54f573feb252, type: 3}
+  player1Sprite: {fileID: 0}
+  player2Sprite: {fileID: 0}
   showDuration: 1.5
 --- !u!114 &594037701
 MonoBehaviour:
