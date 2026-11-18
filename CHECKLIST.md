@@ -346,3 +346,33 @@ Only the saved `.unity` files were checked; unsaved Editor changes are not visib
 - 상대가 나가면 남은 사람도 로비로 돌아간다(CPU 교체 없음).
 - 나갈 때 패키지 경고 `GameObjectsNetcodeNetworkHandler.StopAsync: Failed to stop session: session was never started.`가 나온다(세션 나가기 후 NGO Shutdown을 한 번 더 부름). 동작에는 영향 없음.
 - Quest/Android 기기 2대 테스트는 아직 하지 않았다.
+
+# 게임 종료 → 승자 표시 → 3초 뒤 일시 정지 창 (2026-11-18)
+
+## 목표와 범위
+- BowlingScene에서 `GameManager`가 `GameOver`가 되면 승자(대전) 또는 최종 점수(솔로)를 보여 주고, `pauseMenuDelay`(기본 3초) 뒤 `PauseMenu`의 `Paused` 창을 연다.
+
+## 작업
+- [x] `GameManager`: `pauseMenu`(비우면 같은 오브젝트의 `PauseMenu`), `pauseMenuDelay = 3f`(0보다 작으면 열지 않음) public 필드 추가.
+- [x] 승자 표시는 기존 `resultPanel`/`resultText`(BowlingScene: `1pScoreboard` World Space 캔버스의 `GameOverPanel`/`ResultText`)를 재사용. `GetWinnerMessage()`로 문구를 한 곳에서 만들고, 상태 문구(`statusText`)에도 승자("1P Wins!"/"CPU Wins"/"Draw", 솔로는 "Final Score : N")를 띄운다(전에는 마지막 투구 문구).
+- [x] `ShowPauseMenuAfterResult()` 코루틴: `WaitForSecondsRealtime`으로 대기(일시 정지로 `timeScale`이 0이어도 진행), 끝날 때 상태가 `GameOver`일 때만 `PauseMenu.Pause()` 호출. `StartNewGame`의 `StopAllCoroutines`로 취소된다.
+- 씬 파일은 바꾸지 않았다(BowlingScene의 `GameManager` 오브젝트에 이미 `PauseMenu`가 있어 자동으로 찾는다).
+
+## 검증 기록
+- Unity Editor 컴파일: 오류 0(콘솔 확인).
+- BowlingScene Play 모드(점수표를 리플렉션으로 채우고 CPU 마지막 투구 판정을 실행해 종료 유도, 실제 투구 아님):
+  - 결과 패널 표시 "Game Over | 1P : 70 | CPU : 56 | 1P Wins!", 상태 문구 "1P Wins!" 확인.
+  - 결과 표시 55.68s → 일시 정지 58.68s(정확히 3.00초), `timeScale` 0 확인.
+  - 결과 1.5초 뒤 `StartNewGame` → 이후 6초 동안 일시 정지 창 열리지 않음(취소 확인).
+  - 대기 중 수동 일시 정지(1초간 timeScale 0) 후 이어하기 → 결과 3.00초 뒤 일시 정지 창 열림.
+- 미확인: 솔로 게임(`cpuBowler` 없음) 문구, 실제 10프레임 플레이로 끝까지 진행, 기기(Quest) 표시.
+
+## 알려진 제한
+- 일시 정지 창에는 다시 하기 버튼이 없다(이어하기/나가기만). 게임 종료 후 이어하기를 누르면 결과 화면으로 돌아간다.
+
+## RETRY 버튼 추가 (2026-11-18)
+- [x] `PauseMenu.retryButton` + `Retry()`: 시간 복구·창 닫기 후 `GameManager.Instance.StartNewGame()`(GameManager가 없으면 현재 씬 다시 로드). 예약된 게임 종료 일시 정지는 `StartNewGame`이 취소.
+- [x] BowlingScene `Paused`에 `retry` 버튼 추가(`quit` 복제, `Assets/Sprites/Retry.png`, 균등 스케일 1.9016, 160×53.3, preserveAspect) 후 씬 저장. 저장 전 메모리 씬과 디스크 파일 차이가 GameManager 새 필드 두 줄뿐임을 확인.
+- [x] 배치: RESUME(y 175) → RETRY(y 40) → EXIT(y −95)로 기존 두 버튼 위치도 옮겼다(전: start 127, quit −16).
+- 검증(Play 모드): 게임 종료 → 3초 뒤 일시 정지 → RETRY `onClick` 호출 → 창 닫힘, timeScale 1, 상태 Ready, 점수 0, 결과 패널 꺼짐. Main Camera 렌더 캡처로 세 버튼이 겹치지 않는 것 확인.
+- 미확인: VR 컨트롤러 레이로 실제 클릭, 기기 표시. TutorialScene `Paused`에는 추가하지 않음.

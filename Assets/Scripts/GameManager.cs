@@ -37,6 +37,12 @@ public class GameManager : MonoBehaviour
     public GameObject resultPanel;
     public TextMeshProUGUI resultText;
 
+    [Header("Game Over (선택 사항)")]
+    [Tooltip("게임이 끝나고 승자를 보여 준 뒤 열 일시 정지 창. 비우면 같은 오브젝트의 PauseMenu를 쓰고, 그것도 없으면 열지 않는다.")]
+    public PauseMenu pauseMenu;
+    [Tooltip("승자를 보여 준 뒤 일시 정지 창을 열 때까지 기다리는 시간(초, 실제 시간). 0보다 작으면 열지 않는다.")]
+    public float pauseMenuDelay = 3f;
+
     [Header("Turn UI (선택 사항)")]
     [Tooltip("점수, 상태, 턴 표시에 쓰는 플레이어 이름.")]
     public string playerName = "1P";
@@ -190,10 +196,6 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator ResolveRollRoutine()
     {
-        // 차례는 이 투구가 끝날 때까지 바뀌지 않으므로 지금 차례의 레인과 점수표를 쓴다.
-        PinSetter lane = ActivePinSetter;
-        BowlingScoreCard card = ActiveCard;
-
         float start = Time.time;
         yield return new WaitForSeconds(minSettleTime);
 
@@ -216,8 +218,10 @@ public class GameManager : MonoBehaviour
         {
             State = GameState.GameOver;
             UpdateUI();
-            SetStatus(message);
             ShowResult();
+            // 승자를 보여 주고 잠시 뒤 일시 정지 창(다시 하기·나가기)을 연다.
+            // 이 코루틴 안에서 StartCoroutine을 부르므로 StartNewGame의 StopAllCoroutines로 함께 취소된다.
+            if (pauseMenuDelay >= 0f) StartCoroutine(ShowPauseMenuAfterResult());
             yield break;
         }
 
@@ -276,6 +280,16 @@ public class GameManager : MonoBehaviour
         else if (message == "SPARE!") BowlingEffects.Instance.PlaySpare(lane.GetRackCenter());
     }
 
+    // 대전이면 승자 문구("1P Wins!", "CPU Wins", "Draw"), 솔로면 최종 점수.
+    private string GetWinnerMessage()
+    {
+        int total = scoreCard.GetTotalScore();
+        if (!HasCpu) return $"Final Score : {total}";
+
+        int cpuTotal = cpuCard.GetTotalScore();
+        return total > cpuTotal ? $"{playerName} Wins!" : total < cpuTotal ? $"{opponentName} Wins" : "Draw";
+    }
+
     private void ShowResult()
     {
         int total = scoreCard.GetTotalScore();
@@ -284,8 +298,7 @@ public class GameManager : MonoBehaviour
             if (HasCpu)
             {
                 int cpuTotal = cpuCard.GetTotalScore();
-                string winner = total > cpuTotal ? $"{playerName} Wins!" : total < cpuTotal ? $"{opponentName} Wins" : "Draw";
-                resultText.text = $"Game Over\n{playerName} : {total}\n{opponentName} : {cpuTotal}\n{winner}";
+                resultText.text = $"Game Over\n{playerName} : {total}\n{opponentName} : {cpuTotal}\n{GetWinnerMessage()}";
             }
             else
             {
@@ -293,6 +306,27 @@ public class GameManager : MonoBehaviour
             }
         }
         if (resultPanel != null) resultPanel.SetActive(true);
+        // 결과 패널이 없거나 안 보이는 위치여도 상태 문구로 승자를 알 수 있게 한다.
+        SetStatus(GetWinnerMessage());
+    }
+
+    // 결과를 보여 준 뒤 pauseMenuDelay초 뒤에 일시 정지 창을 연다.
+    // 그 사이 플레이어가 메뉴 버튼으로 일시 정지해 Time.timeScale이 0이 되어도 멈추지 않도록 실제 시간으로 기다린다.
+    private IEnumerator ShowPauseMenuAfterResult()
+    {
+        yield return new WaitForSecondsRealtime(pauseMenuDelay);
+
+        if (State != GameState.GameOver) yield break;
+
+        PauseMenu menu = pauseMenu != null ? pauseMenu : GetComponent<PauseMenu>();
+        if (menu == null)
+        {
+            Debug.LogWarning("GameManager: pauseMenu가 지정되지 않아 게임 종료 후 일시 정지 창을 열 수 없습니다.", this);
+            yield break;
+        }
+
+        // 이미 열려 있으면 Pause()가 아무것도 하지 않는다.
+        menu.Pause();
     }
 
     private void UpdateUI()

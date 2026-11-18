@@ -30,6 +30,8 @@ public class PauseMenu : MonoBehaviour
     [Header("Buttons")]
     public Button resumeButton;
     public Button quitButton;
+    [Tooltip("다시 하기 버튼. 창을 닫고 GameManager.StartNewGame()으로 새 게임을 시작한다. GameManager가 없는 씬이면 현재 씬을 다시 불러온다.")]
+    public Button retryButton;
 
     [Header("Sound")]
     [Tooltip("소리 끄기 버튼. 누를 때마다 음소거가 켜지고 꺼진다. Toggle을 쓰면 비워 두고 muteToggle을 연결한다.")]
@@ -65,6 +67,7 @@ public class PauseMenu : MonoBehaviour
 
         if (resumeButton != null) resumeButton.onClick.AddListener(Resume);
         if (quitButton != null) quitButton.onClick.AddListener(Quit);
+        if (retryButton != null) retryButton.onClick.AddListener(Retry);
         if (muteButton != null) muteButton.onClick.AddListener(OnMuteButton);
         if (muteToggle != null) muteToggle.onValueChanged.AddListener(OnMuteToggle);
         if (volumeSlider != null) volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
@@ -164,6 +167,24 @@ public class PauseMenu : MonoBehaviour
         Time.timeScale = 1f;
         SetPanelVisible(false);
         PlayerPrefs.Save();
+    }
+
+    // 다시 하기 버튼. 시간을 되돌리고 창을 닫은 뒤 새 게임을 시작한다.
+    public void Retry()
+    {
+        IsPaused = false;
+        Time.timeScale = 1f;
+        SetPanelVisible(false);
+        PlayerPrefs.Save();
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.StartNewGame();
+        }
+        else
+        {
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        }
     }
 
     // 나가기 버튼.
